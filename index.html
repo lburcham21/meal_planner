@@ -12,7 +12,6 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
-  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -1689,7 +1688,6 @@ function closeSyncModal() {
 }
 
 function syncSignOut() {
-  if (syncAccessToken) google.accounts.oauth2.revoke(syncAccessToken, () => {});
   syncAccessToken = null;
   setSyncUI(syncSheetId ? 'ready' : 'off');
   closeSyncModal();
@@ -1817,43 +1815,27 @@ function hideGate() {
 }
 
 function manualSignIn() {
-  if (typeof google === 'undefined' || !google.accounts) {
-    document.getElementById('signin-status').textContent = 'Still loading — please wait a moment and try again';
-    return;
-  }
   if (!syncClientId) {
     hideGate();
     openSyncModal();
     return;
   }
-  document.getElementById('signin-status').textContent = 'Opening Google sign-in…';
-  document.getElementById('signin-btn').style.display = 'none';
-  try {
-    google.accounts.oauth2.initTokenClient({
-      client_id: syncClientId,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      callback: (resp) => {
-        if (resp.error) {
-          document.getElementById('signin-status').textContent = 'Sign in failed: ' + resp.error;
-          document.getElementById('signin-btn').style.display = 'inline-block';
-          setSyncUI('error');
-          return;
-        }
-        syncAccessToken = resp.access_token;
-        hideGate();
-        setSyncUI('syncing');
-        document.getElementById('sync-step-setup').style.display = 'none';
-        document.getElementById('sync-step-connected').style.display = 'block';
-        loadFromSheets();
-      }
-    }).requestAccessToken({ prompt: 'consent' });
-  } catch(e) {
-    document.getElementById('signin-status').textContent = 'Error: ' + e.message;
-    document.getElementById('signin-btn').style.display = 'inline-block';
-  }
+  // Save state so we can restore after redirect
+  localStorage.setItem('bp-week', JSON.stringify(weekPlan));
+  localStorage.setItem('bp-extras', JSON.stringify(extraItems));
+
+  const redirectUri = location.origin + location.pathname;
+  const scope = 'https://www.googleapis.com/auth/spreadsheets';
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth' +
+    '?client_id=' + encodeURIComponent(syncClientId) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&response_type=token' +
+    '&scope=' + encodeURIComponent(scope) +
+    '&prompt=select_account';
+
+  window.location.href = url;
 }
 
-// Also expose for the sync modal button
 function startGoogleSignIn() {
   const sheetId = document.getElementById('sync-sheet-id').value.trim();
   const clientId = document.getElementById('sync-client-id').value.trim();
@@ -1866,24 +1848,37 @@ function startGoogleSignIn() {
   manualSignIn();
 }
 
-// ---- INIT ----
+// ---- INIT — handle OAuth redirect callback ----
 renderRecipes();
 updateShoppingBadge();
 
-// Show gate immediately, then wait for Google script to load
-showGate('Loading…', false);
-const tryInit = () => {
-  if (typeof google !== 'undefined' && google.accounts) {
-    if (syncSheetId && syncClientId) {
-      showGate('Sign in to access your recipes', true);
-    } else {
-      document.getElementById('signin-status').innerHTML = 'No sync configured yet.<br><br><button onclick="hideGate();openSyncModal()" style="background:#2C1810;color:#F5E6C8;padding:12px 24px;border-radius:8px;font-size:13px;font-family:\'DM Mono\',monospace;border:none;cursor:pointer">Set up Google Sheets →</button>';
+(function handleOAuthCallback() {
+  // Check if we're returning from Google OAuth (token in URL hash)
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const token = params.get('access_token');
+    if (token) {
+      syncAccessToken = token;
+      // Clean the token out of the URL
+      history.replaceState(null, '', window.location.pathname);
+      setSyncUI('syncing');
+      hideGate();
+      loadFromSheets();
+      return;
     }
-  } else {
-    setTimeout(tryInit, 300);
   }
-};
-setTimeout(tryInit, 500);
+
+  // Not a callback — show gate normally
+  if (syncSheetId && syncClientId) {
+    showGate('Sign in to access your recipes', true);
+  } else {
+    showGate('', false);
+    document.getElementById('signin-status').innerHTML =
+      'No sync configured yet.<br><br>' +
+      '<button onclick="hideGate();openSyncModal()" style="background:#2C1810;color:#F5E6C8;padding:12px 24px;border-radius:8px;font-size:13px;font-family:\'DM Mono\',monospace;border:none;cursor:pointer">Set up Google Sheets →</button>';
+  }
+})();
 
 // ---- SERVICE WORKER ----
 if ('serviceWorker' in navigator) {
