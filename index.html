@@ -453,6 +453,17 @@
 <body>
 
 <header id="header">
+
+<!-- SIGN-IN GATE -->
+<div id="signin-gate" style="display:none;position:fixed;inset:0;background:#FAF7F2;z-index:999;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center">
+  <div style="font-size:52px;margin-bottom:16px">🥐</div>
+  <div style="font-size:26px;font-weight:700;color:#2C1810;font-family:'Lora',serif;margin-bottom:8px">The Bakery Planner</div>
+  <div style="font-size:14px;color:#8B6914;font-style:italic;margin-bottom:40px">Sign in to access your recipes</div>
+  <div id="signin-status" style="font-size:13px;color:#C4B090;font-family:'DM Mono',monospace;margin-bottom:24px">Connecting to Google…</div>
+  <button id="signin-btn" onclick="manualSignIn()" style="display:none;background:#2C1810;color:#F5E6C8;padding:14px 32px;border-radius:10px;font-size:15px;font-family:'DM Mono',monospace;border:none;cursor:pointer">
+    Sign in with Google
+  </button>
+</div>
   <div class="logo">
     <span style="font-size:24px">🥐</span>
     <div>
@@ -770,26 +781,10 @@ const CATEGORIES = ["All","Bread","Quick Bread","Cookies","Pastry","Muffins","Ca
 const CAT_COLORS = { Bread:"#8B6914","Quick Bread":"#A0522D",Cookies:"#B8860B",Pastry:"#CD853F",Muffins:"#D2691E",Cake:"#BC8F5F",Pie:"#C19A6B","Children's Snacks":"#5B9E6B" };
 const CAT_EMOJI = { Bread:"🍞","Quick Bread":"🍞",Cookies:"🍪",Pastry:"🥐",Muffins:"🧁",Cake:"🎂",Pie:"🥧","Children's Snacks":"🐣" };
 
-const INITIAL_RECIPES = [
-  { id:1, name:"Sourdough Bread", category:"Bread", time:"4h", servings:8,
-    ingredients:[{item:"bread flour",amount:"500g"},{item:"water",amount:"375ml"},{item:"sourdough starter",amount:"100g"},{item:"salt",amount:"10g"}],
-    tags:["bread","fermented","vegetarian"] },
-  { id:2, name:"Chocolate Chip Cookies", category:"Cookies", time:"45m", servings:24,
-    ingredients:[{item:"all-purpose flour",amount:"2¼ cups"},{item:"butter",amount:"1 cup"},{item:"brown sugar",amount:"¾ cup"},{item:"granulated sugar",amount:"¾ cup"},{item:"eggs",amount:"2"},{item:"vanilla extract",amount:"2 tsp"},{item:"baking soda",amount:"1 tsp"},{item:"salt",amount:"1 tsp"},{item:"chocolate chips",amount:"2 cups"}],
-    tags:["cookies","dessert","sweet"] },
-  { id:3, name:"Banana Bread", category:"Quick Bread", time:"1h 15m", servings:10,
-    ingredients:[{item:"ripe bananas",amount:"3 large"},{item:"all-purpose flour",amount:"1½ cups"},{item:"butter",amount:"⅓ cup"},{item:"sugar",amount:"¾ cup"},{item:"egg",amount:"1"},{item:"baking soda",amount:"1 tsp"},{item:"salt",amount:"¼ tsp"},{item:"vanilla extract",amount:"1 tsp"}],
-    tags:["bread","sweet","breakfast"] },
-  { id:4, name:"Cinnamon Rolls", category:"Pastry", time:"3h", servings:12,
-    ingredients:[{item:"all-purpose flour",amount:"4 cups"},{item:"milk",amount:"1 cup"},{item:"butter",amount:"⅓ cup"},{item:"sugar",amount:"¼ cup"},{item:"yeast",amount:"2¼ tsp"},{item:"eggs",amount:"2"},{item:"salt",amount:"1 tsp"},{item:"brown sugar",amount:"¾ cup"},{item:"cinnamon",amount:"2½ tbsp"},{item:"cream cheese",amount:"4 oz"},{item:"powdered sugar",amount:"1½ cups"}],
-    tags:["pastry","breakfast","sweet","yeast"] },
-  { id:5, name:"Blueberry Muffins", category:"Muffins", time:"35m", servings:12,
-    ingredients:[{item:"all-purpose flour",amount:"2 cups"},{item:"sugar",amount:"¾ cup"},{item:"baking powder",amount:"2½ tsp"},{item:"salt",amount:"½ tsp"},{item:"egg",amount:"1"},{item:"milk",amount:"¾ cup"},{item:"vegetable oil",amount:"⅓ cup"},{item:"blueberries",amount:"1 cup"}],
-    tags:["muffins","breakfast","fruit"] },
-];
+const INITIAL_RECIPES = [];
 
 // State
-let recipes = JSON.parse(localStorage.getItem('bp-recipes') || 'null') || INITIAL_RECIPES;
+let recipes = [];
 // Migrate old weekPlan format (single recipe per day) to new array format
 let _rawPlan = JSON.parse(localStorage.getItem('bp-week') || '{}');
 let weekPlan = {};
@@ -1693,35 +1688,6 @@ function closeSyncModal() {
   document.getElementById('sync-modal').style.display = 'none';
 }
 
-function startGoogleSignIn() {
-  const sheetId = document.getElementById('sync-sheet-id').value.trim();
-  const clientId = document.getElementById('sync-client-id').value.trim();
-  if (!sheetId || !clientId) { showToast('Please fill in both fields'); return; }
-  syncSheetId = sheetId;
-  syncClientId = clientId;
-  localStorage.setItem('bp-sync-sheet-id', syncSheetId);
-  localStorage.setItem('bp-sync-client-id', syncClientId);
-
-  if (typeof google === 'undefined' || !google.accounts) {
-    showToast('Google sign-in not loaded yet — try again in a moment');
-    return;
-  }
-
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: syncClientId,
-    scope: 'https://www.googleapis.com/auth/spreadsheets',
-    callback: (resp) => {
-      if (resp.error) { showToast('Sign in failed: ' + resp.error); setSyncUI('error'); return; }
-      syncAccessToken = resp.access_token;
-      setSyncUI('syncing');
-      document.getElementById('sync-step-setup').style.display = 'none';
-      document.getElementById('sync-step-connected').style.display = 'block';
-      loadFromSheets();
-    }
-  });
-  client.requestAccessToken();
-}
-
 function syncSignOut() {
   if (syncAccessToken) google.accounts.oauth2.revoke(syncAccessToken, () => {});
   syncAccessToken = null;
@@ -1839,16 +1805,89 @@ function scheduleSync() {
   syncDebounce = setTimeout(pushToSheets, 2000);
 }
 
+// ---- AUTH GATE ----
+function showGate(message, showBtn) {
+  const gate = document.getElementById('signin-gate');
+  gate.style.display = 'flex';
+  document.getElementById('signin-status').textContent = message;
+  document.getElementById('signin-btn').style.display = showBtn ? 'inline-block' : 'none';
+}
+function hideGate() {
+  document.getElementById('signin-gate').style.display = 'none';
+}
+
+function manualSignIn() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    document.getElementById('signin-status').textContent = 'Still loading — please wait a moment and try again';
+    return;
+  }
+  if (!syncClientId) {
+    hideGate();
+    openSyncModal();
+    return;
+  }
+  document.getElementById('signin-status').textContent = 'Opening Google sign-in…';
+  document.getElementById('signin-btn').style.display = 'none';
+  try {
+    google.accounts.oauth2.initTokenClient({
+      client_id: syncClientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      callback: (resp) => {
+        if (resp.error) {
+          document.getElementById('signin-status').textContent = 'Sign in failed: ' + resp.error;
+          document.getElementById('signin-btn').style.display = 'inline-block';
+          setSyncUI('error');
+          return;
+        }
+        syncAccessToken = resp.access_token;
+        hideGate();
+        setSyncUI('syncing');
+        document.getElementById('sync-step-setup').style.display = 'none';
+        document.getElementById('sync-step-connected').style.display = 'block';
+        loadFromSheets();
+      }
+    }).requestAccessToken({ prompt: 'consent' });
+  } catch(e) {
+    document.getElementById('signin-status').textContent = 'Error: ' + e.message;
+    document.getElementById('signin-btn').style.display = 'inline-block';
+  }
+}
+
+// Also expose for the sync modal button
+function startGoogleSignIn() {
+  const sheetId = document.getElementById('sync-sheet-id').value.trim();
+  const clientId = document.getElementById('sync-client-id').value.trim();
+  if (!sheetId || !clientId) { showToast('Please fill in both fields'); return; }
+  syncSheetId = sheetId;
+  syncClientId = clientId;
+  localStorage.setItem('bp-sync-sheet-id', syncSheetId);
+  localStorage.setItem('bp-sync-client-id', syncClientId);
+  closeSyncModal();
+  manualSignIn();
+}
+
 // ---- INIT ----
 renderRecipes();
 updateShoppingBadge();
-if (syncSheetId && syncClientId) { setSyncUI('ready'); } else { setSyncUI('off'); }
+
+// Show gate immediately, then wait for Google script to load
+showGate('Loading…', false);
+const tryInit = () => {
+  if (typeof google !== 'undefined' && google.accounts) {
+    if (syncSheetId && syncClientId) {
+      showGate('Sign in to access your recipes', true);
+    } else {
+      document.getElementById('signin-status').innerHTML = 'No sync configured yet.<br><br><button onclick="hideGate();openSyncModal()" style="background:#2C1810;color:#F5E6C8;padding:12px 24px;border-radius:8px;font-size:13px;font-family:\'DM Mono\',monospace;border:none;cursor:pointer">Set up Google Sheets →</button>';
+    }
+  } else {
+    setTimeout(tryInit, 300);
+  }
+};
+setTimeout(tryInit, 500);
 
 // ---- SERVICE WORKER ----
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 </script>
 </body>
