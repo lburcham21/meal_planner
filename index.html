@@ -4,8 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Bakery Planner</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2C1810" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bakery Planner" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -454,6 +461,10 @@
     </div>
   </div>
   <nav>
+    <button id="sync-btn" onclick="openSyncModal()" style="background:transparent;border:1px solid rgba(200,169,106,0.3);color:#C4B090;padding:6px 14px;border-radius:6px;font-size:11px;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:6px;cursor:pointer;transition:all 0.2s">
+      <span id="sync-dot" style="width:7px;height:7px;border-radius:50%;background:#C4B090;flex-shrink:0;display:inline-block"></span>
+      <span id="sync-label">Not synced</span>
+    </button>
     <button class="nav-btn active" data-view="recipes" onclick="switchView('recipes')">📖 Recipes</button>
     <button class="nav-btn" data-view="planner" onclick="switchView('planner')">📅 Week Planner</button>
     <button class="nav-btn" data-view="shopping" onclick="switchView('shopping')">🛒 Shopping List <span id="plan-badge" class="badge" style="display:none">0</span></button>
@@ -582,6 +593,59 @@
 </div>
 
 <div id="toast">Copied to clipboard!</div>
+
+<!-- SYNC MODAL -->
+<div id="sync-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSyncModal()">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">☁ Google Sheets Sync</div>
+        <div style="font-size:13px;color:#8B6914;font-style:italic;margin-top:4px">Your recipes save automatically to Google Sheets</div>
+      </div>
+      <button class="close-btn" onclick="closeSyncModal()">×</button>
+    </div>
+
+    <!-- Step 1: Enter details -->
+    <div id="sync-step-setup">
+      <div style="margin-bottom:16px">
+        <div class="field-label">SPREADSHEET ID</div>
+        <input class="field-input" id="sync-sheet-id" placeholder="Paste the ID from your Google Sheet URL" style="font-family:'DM Mono',monospace;font-size:12px" />
+        <div style="font-size:11px;color:#C4B090;margin-top:5px;font-family:'DM Mono',monospace">Found between /d/ and /edit in the sheet URL</div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div class="field-label">GOOGLE CLIENT ID</div>
+        <input class="field-input" id="sync-client-id" placeholder="Paste your OAuth Client ID" style="font-family:'DM Mono',monospace;font-size:12px" />
+      </div>
+      <button onclick="startGoogleSignIn()" style="width:100%;background:#2C1810;color:#F5E6C8;padding:13px;border-radius:10px;font-size:14px;font-family:'DM Mono',monospace;border:none;cursor:pointer;margin-bottom:16px">Sign in with Google →</button>
+
+      <div style="background:#FBF6EE;border-radius:10px;padding:16px;border:1px solid #F0E8D8">
+        <div style="font-size:10px;font-family:'DM Mono',monospace;color:#8B6914;letter-spacing:1px;margin-bottom:10px">ONE-TIME SETUP</div>
+        <div style="font-size:12px;color:#6B5D4F;line-height:1.9">
+          <div><strong>1.</strong> Go to <strong>sheets.google.com</strong> → create a blank sheet → copy the ID from the URL</div>
+          <div><strong>2.</strong> Go to <strong>console.cloud.google.com</strong> → New Project</div>
+          <div><strong>3.</strong> Enable <strong>Google Sheets API</strong></div>
+          <div><strong>4.</strong> OAuth consent screen → External → add your name → Save</div>
+          <div><strong>5.</strong> Credentials → OAuth Client ID → Web app → add your site URL → copy Client ID</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connected state -->
+    <div id="sync-step-connected" style="display:none;text-align:center;padding:16px 0">
+      <div style="font-size:40px;margin-bottom:12px">✅</div>
+      <div style="font-size:16px;font-weight:600;color:#2C1810;margin-bottom:6px">Connected!</div>
+      <div id="sync-connected-email" style="font-size:13px;color:#8B6914;margin-bottom:16px"></div>
+      <div style="background:#F0FFF4;border:1px solid #9FD4AA;border-radius:8px;padding:12px;font-size:13px;color:#3D7A47;margin-bottom:20px;text-align:left">
+        Recipes save automatically every time you add or edit one. They load from Google Sheets when you open the app — so your data is safe no matter what happens to your browser.
+      </div>
+      <button onclick="syncSignOut()" style="background:none;border:2px solid #E8DDD0;color:#8B6914;padding:9px 22px;border-radius:8px;font-size:13px;font-family:'DM Mono',monospace;cursor:pointer">Disconnect</button>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button onclick="closeSyncModal()" style="background:none;border:2px solid #E8DDD0;color:#8B6914;padding:9px 20px;border-radius:8px;font-size:13px;font-family:'DM Mono',monospace;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- AUTOPICK MODAL -->
 <div id="autopick-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAutopickModal()">
@@ -745,6 +809,7 @@ function save() {
   localStorage.setItem('bp-recipes', JSON.stringify(recipes));
   localStorage.setItem('bp-week', JSON.stringify(weekPlan));
   localStorage.setItem('bp-extras', JSON.stringify(extraItems));
+  scheduleSync();
 }
 
 // Extra one-off shopping items (cleared each week manually)
@@ -1590,9 +1655,201 @@ function saveImportedRecipe() {
   showToast(`"${recipe.name}" imported! 🎉`);
 }
 
+// ---- GOOGLE SHEETS SYNC ----
+let syncSheetId = localStorage.getItem('bp-sync-sheet-id') || '';
+let syncClientId = localStorage.getItem('bp-sync-client-id') || '';
+let syncAccessToken = null;
+let syncDebounce = null;
+const SYNC_TAB = 'Recipes';
+
+function setSyncUI(state) {
+  const btn = document.getElementById('sync-btn');
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  if (!btn) return;
+  const states = {
+    off:     { color: '#C4B090', dot: '#C4B090', label: 'Not synced' },
+    ready:   { color: '#C8A96A', dot: '#C8A96A', label: 'Sign in' },
+    syncing: { color: '#C8A96A', dot: '#C8A96A', label: 'Saving...' },
+    synced:  { color: '#6BAF7A', dot: '#6BAF7A', label: 'Synced' },
+    error:   { color: '#E8543A', dot: '#E8543A', label: 'Sync error' },
+  };
+  const s = states[state] || states.off;
+  btn.style.color = s.color;
+  btn.style.borderColor = s.color.replace(')', ', 0.4)').replace('rgb', 'rgba');
+  dot.style.background = s.dot;
+  lbl.textContent = s.label;
+}
+
+function openSyncModal() {
+  document.getElementById('sync-sheet-id').value = syncSheetId;
+  document.getElementById('sync-client-id').value = syncClientId;
+  const connected = !!syncAccessToken;
+  document.getElementById('sync-step-setup').style.display = connected ? 'none' : 'block';
+  document.getElementById('sync-step-connected').style.display = connected ? 'block' : 'none';
+  document.getElementById('sync-modal').style.display = 'flex';
+}
+function closeSyncModal() {
+  document.getElementById('sync-modal').style.display = 'none';
+}
+
+function startGoogleSignIn() {
+  const sheetId = document.getElementById('sync-sheet-id').value.trim();
+  const clientId = document.getElementById('sync-client-id').value.trim();
+  if (!sheetId || !clientId) { showToast('Please fill in both fields'); return; }
+  syncSheetId = sheetId;
+  syncClientId = clientId;
+  localStorage.setItem('bp-sync-sheet-id', syncSheetId);
+  localStorage.setItem('bp-sync-client-id', syncClientId);
+
+  if (typeof google === 'undefined' || !google.accounts) {
+    showToast('Google sign-in not loaded yet — try again in a moment');
+    return;
+  }
+
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: syncClientId,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    callback: (resp) => {
+      if (resp.error) { showToast('Sign in failed: ' + resp.error); setSyncUI('error'); return; }
+      syncAccessToken = resp.access_token;
+      setSyncUI('syncing');
+      document.getElementById('sync-step-setup').style.display = 'none';
+      document.getElementById('sync-step-connected').style.display = 'block';
+      loadFromSheets();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function syncSignOut() {
+  if (syncAccessToken) google.accounts.oauth2.revoke(syncAccessToken, () => {});
+  syncAccessToken = null;
+  setSyncUI(syncSheetId ? 'ready' : 'off');
+  closeSyncModal();
+  showToast('Disconnected from Google Sheets');
+}
+
+// Encode/decode recipes for Sheets rows
+function recipesToRows(arr) {
+  return arr.map(r => [
+    r.id, r.name, r.category, r.time || '', r.servings || 4,
+    (r.tags || []).join(', '), JSON.stringify(r.ingredients || [])
+  ]);
+}
+function rowsToRecipes(rows) {
+  return rows.filter(r => r[0] && r[1]).map(r => ({
+    id: Number(r[0]) || Date.now(),
+    name: r[1] || '',
+    category: r[2] || 'Bread',
+    time: r[3] || '',
+    servings: parseInt(r[4]) || 4,
+    tags: r[5] ? r[5].split(',').map(t => t.trim()).filter(Boolean) : [],
+    ingredients: (() => { try { return JSON.parse(r[6] || '[]'); } catch { return []; } })()
+  }));
+}
+
+async function loadFromSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  setSyncUI('syncing');
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A2:G1000`;
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + syncAccessToken } });
+    if (res.status === 401) { syncAccessToken = null; setSyncUI('ready'); return; }
+    if (!res.ok) {
+      // Tab may not exist yet — push current recipes to create it
+      await pushToSheets();
+      return;
+    }
+    const data = await res.json();
+    const rows = data.values || [];
+    if (rows.length > 0) {
+      recipes = rowsToRecipes(rows);
+      localStorage.setItem('bp-recipes', JSON.stringify(recipes));
+      renderRecipes();
+    } else {
+      // Sheet exists but is empty — push current recipes
+      await pushToSheets();
+      return;
+    }
+    setSyncUI('synced');
+  } catch(e) {
+    console.error('Sheets load error', e);
+    setSyncUI('error');
+  }
+}
+
+async function pushToSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  setSyncUI('syncing');
+  try {
+    // Ensure the tab exists by writing header + data in one call
+    const header = [['id','name','category','time','servings','tags','ingredients']];
+    const rows = recipesToRows(recipes);
+    const values = [...header, ...rows];
+
+    // Clear first
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A1:G5000:clear`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } }
+    );
+
+    // Write
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A1?valueInputOption=RAW`,
+      {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values })
+      }
+    );
+    if (res.status === 401) { syncAccessToken = null; setSyncUI('ready'); return; }
+    if (!res.ok) {
+      const err = await res.json();
+      // If sheet tab doesn't exist, create it then retry
+      if (err.error && err.error.message && err.error.message.includes('Unable to parse range')) {
+        await createSheetTab();
+        await pushToSheets();
+        return;
+      }
+      throw new Error('Write failed: ' + JSON.stringify(err));
+    }
+    setSyncUI('synced');
+  } catch(e) {
+    console.error('Sheets push error', e);
+    setSyncUI('error');
+  }
+}
+
+async function createSheetTab() {
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: SYNC_TAB } } }] })
+    }
+  );
+}
+
+function scheduleSync() {
+  if (!syncAccessToken) return;
+  clearTimeout(syncDebounce);
+  setSyncUI('syncing');
+  syncDebounce = setTimeout(pushToSheets, 2000);
+}
+
 // ---- INIT ----
 renderRecipes();
 updateShoppingBadge();
+if (syncSheetId && syncClientId) { setSyncUI('ready'); } else { setSyncUI('off'); }
+
+// ---- SERVICE WORKER ----
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
