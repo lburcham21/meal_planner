@@ -797,11 +797,12 @@
     <div class="modal-header">
       <div>
         <div class="modal-title">📅 Week History</div>
-        <div style="font-size:13px;color:#8B6914;font-style:italic;margin-top:4px">Load a previous week plan</div>
+        <div style="font-size:13px;color:#8B6914;font-style:italic;margin-top:4px">Load or delete a previous week plan</div>
       </div>
       <button class="close-btn" onclick="closeWeekHistoryModal()">×</button>
     </div>
-    <div id="week-history-list" style="max-height:460px;overflow-y:auto"></div>
+    <input type="text" id="week-history-search" placeholder="Search by date or meal name…" class="field-input" style="margin-bottom:12px" oninput="renderWeekHistory()" />
+    <div id="week-history-list" style="max-height:420px;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2049,11 +2050,26 @@ function closeWeekHistoryModal() {
 }
 function renderWeekHistory() {
   const list = document.getElementById('week-history-list');
+  const query = (document.getElementById('week-history-search')?.value || '').toLowerCase();
+
   if (weekHistory.length === 0) {
     list.innerHTML = '<div style="text-align:center;color:#C4B090;font-size:13px;padding:24px">No saved weeks yet.<br>Use the Save Week button after planning.</div>';
     return;
   }
-  list.innerHTML = [...weekHistory].reverse().map(h => {
+
+  const filtered = [...weekHistory].reverse().filter(h => {
+    if (!query) return true;
+    const dateLabel = new Date(h.weekOf).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase();
+    const meals = DAYS.flatMap(d => (h.plan[d]||[]).map(r => r.name.toLowerCase()));
+    return dateLabel.includes(query) || meals.some(m => m.includes(query));
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#C4B090;font-size:13px;padding:24px">No weeks match your search.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(h => {
     const d = new Date(h.weekOf);
     const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const meals = DAYS.map(day => h.plan[day] && h.plan[day].length > 0 ? h.plan[day].map(r => r.name).join(', ') : '—');
@@ -2061,7 +2077,10 @@ function renderWeekHistory() {
       <div style="border:1px solid #F0E8D8;border-radius:10px;padding:14px;margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="font-weight:600;color:#2C1810;font-size:14px">Week of ${label}</div>
-          <button onclick="loadWeekFromHistory('${h.weekOf}')" style="background:#2C1810;color:#F5E6C8;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer">Load</button>
+          <div style="display:flex;gap:8px">
+            <button onclick="loadWeekFromHistory('${h.weekOf}')" style="background:#2C1810;color:#F5E6C8;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer">Load</button>
+            <button onclick="deleteWeekFromHistory('${h.weekOf}')" style="background:none;border:1px solid #E8543A;color:#E8543A;padding:6px 10px;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer">Delete</button>
+          </div>
         </div>
         ${DAYS.map((day, i) => `<div style="font-size:12px;color:#6B5D4F;padding:3px 0"><span style="font-family:'DM Mono',monospace;color:#C4B090;display:inline-block;width:80px">${day.substring(0,3).toUpperCase()}</span>${meals[i]}</div>`).join('')}
       </div>`;
@@ -2090,12 +2109,33 @@ async function pushWeekPlanToSheets() {
     const header = [['weekOf', ...DAYS]];
     const rows = weekHistory.map(h => [h.weekOf, ...DAYS.map(d => (h.plan[d]||[]).map(r=>r.name).join(', '))]);
     const values = [...header, ...rows];
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1:H5000:clear`,
-      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } });
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1?valueInputOption=RAW`,
-      { method: 'PUT', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) });
+
+    // Clear
+    const clearRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1:H5000:clear`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } }
+    );
+
+    // Write — if tab doesn't exist, create it first
+    const writeRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1?valueInputOption=RAW`,
+      { method: 'PUT', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+    );
+    if (!writeRes.ok) {
+      const err = await writeRes.json();
+      if (err.error && err.error.message && err.error.message.includes('Unable to parse range')) {
+        // Create the tab then retry
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests: [{ addSheet: { properties: { title: WEEK_TAB } } }] })
+        });
+        await pushWeekPlanToSheets();
+      }
+    }
   } catch(e) { console.error('Week plan sync error', e); }
 }
+
 async function loadWeekHistoryFromSheets() {
   if (!syncAccessToken || !syncSheetId) return;
   try {
@@ -2111,6 +2151,15 @@ async function loadWeekHistoryFromSheets() {
     }));
     localStorage.setItem('bp-history', JSON.stringify(weekHistory));
   } catch(e) { console.error('Week history load error', e); }
+}
+
+function deleteWeekFromHistory(weekOf) {
+  if (!confirm('Delete this week from history?')) return;
+  weekHistory = weekHistory.filter(h => h.weekOf !== weekOf);
+  localStorage.setItem('bp-history', JSON.stringify(weekHistory));
+  pushWeekPlanToSheets();
+  renderWeekHistory();
+  showToast('Week deleted');
 }
 
 // ---- SERVICE WORKER ----
