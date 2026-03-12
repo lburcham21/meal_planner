@@ -1030,11 +1030,10 @@ function openAddModal() {
   document.getElementById('add-modal-title').textContent = 'New Recipe';
   document.getElementById('save-recipe-btn').textContent = 'Save Recipe';
   document.getElementById('f-name').value = '';
-  populateCategoryDropdown();
+  populateCategoryDropdown(userCategories[0] || 'Breakfast');
   document.getElementById('f-time').value = '';
   document.getElementById('f-servings').value = '';
   document.getElementById('f-tags').value = '';
-  document.getElementById('f-category').value = 'Bread';
   document.getElementById('ing-fields').innerHTML = `
     <div class="ing-row">
       <input class="field-input ing-item" placeholder="Ingredient name" />
@@ -1054,7 +1053,7 @@ function openEditModal() {
   document.getElementById('f-time').value = r.time || '';
   document.getElementById('f-servings').value = r.servings || '';
   document.getElementById('f-tags').value = (r.tags || []).join(', ');
-  document.getElementById('f-category').value = r.category || 'Bread';
+  populateCategoryDropdown(r.category || userCategories[0] || 'Breakfast');
   // Populate ingredient rows
   const fields = document.getElementById('ing-fields');
   fields.innerHTML = (r.ingredients.length ? r.ingredients : [{ item: '', amount: '' }]).map(() => `
@@ -2045,6 +2044,7 @@ updateShoppingBadge();
       setSyncUI('syncing');
       hideGate();
       loadFromSheets();
+      pushCategoriesToSheets();
       return;
     }
   }
