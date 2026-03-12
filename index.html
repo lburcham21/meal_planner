@@ -601,7 +601,15 @@
       </div>
       <div>
         <div class="field-label">TAGS (COMMA SEPARATED)</div>
-        <input class="field-input" id="f-tags" placeholder="e.g. quick, gluten-free" style="font-family:'DM Mono',monospace" />
+        <input class="field-input" id="f-tags" placeholder="e.g. chicken, quick, gluten-free" style="font-family:'DM Mono',monospace" />
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <div style="font-size:10px;font-family:'DM Mono',monospace;color:#C4B090;padding-top:3px">PROTEIN:</div>
+          ${['Chicken','Beef','Pork','Seafood','Vegetarian','Other'].map(p => `
+            <button type="button" onclick="addProteinTag('${p}')" style="
+              padding:3px 10px;border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;
+              cursor:pointer;border:1px solid #E8DDD0;background:white;color:#8B6914;transition:all 0.15s"
+              onmouseover="this.style.background='#F5ECD8'" onmouseout="this.style.background='white'">${p}</button>`).join('')}
+        </div>
       </div>
       <div>
         <div class="field-label">SOURCE URL (OPTIONAL)</div>
@@ -997,6 +1005,7 @@ function renderRecipes() {
         </div>
         <div class="card-tags">${r.tags.slice(0,3).map(t=>`<span class="tag-pill">${t}</span>`).join('')}</div>
         ${getLastMadeHtml(r.id)}
+        ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-block;margin-top:8px;font-size:11px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.75">🔗 Link to recipe</a>` : ''}
       </div>
     </div>
   `).join('');
@@ -1076,6 +1085,15 @@ function addIngField() {
   row.className = 'ing-row';
   row.innerHTML = `<input class="field-input ing-item" placeholder="Ingredient name" /><input class="field-input ing-amount" placeholder="Amount" />`;
   document.getElementById('ing-fields').appendChild(row);
+}
+
+function addProteinTag(protein) {
+  const el = document.getElementById('f-tags');
+  const current = el.value.split(',').map(t => t.trim()).filter(Boolean);
+  if (!current.map(t => t.toLowerCase()).includes(protein.toLowerCase())) {
+    current.push(protein);
+    el.value = current.join(', ');
+  }
 }
 
 function saveRecipe() {
@@ -1198,20 +1216,20 @@ function renderPlanner() {
   badge.textContent = totalCount;
   badge.style.display = totalCount > 0 ? 'inline' : 'none';
 
-  // Day list
+  // Day list — chips are clickable to open detail modal
   const dayList = document.getElementById('day-list');
   dayList.innerHTML = DAYS.map(day => {
     const dayRecipes = weekPlan[day] || [];
     const chipsHtml = dayRecipes.length > 0
       ? dayRecipes.map((r, idx) => `
-          <div class="day-recipe-chip">
+          <div class="day-recipe-chip" style="cursor:pointer" onclick="openDetailModal(${r.id})">
             <div class="day-chip-info">
               <div class="day-chip-name">${r.name}</div>
               <div class="day-chip-sub">${r.category} · ${r.time}</div>
             </div>
             <div class="day-chip-actions">
               <div class="day-dot" style="background:${getCatColor(r.category)}"></div>
-              <button class="remove-chip" onclick="removeFromDay('${day}',${idx})" title="Remove">×</button>
+              <button class="remove-chip" onclick="event.stopPropagation();removeFromDay('${day}',${idx})" title="Remove">×</button>
             </div>
           </div>`).join('')
       : `<div class="day-empty">Drop recipes here</div>`;
@@ -1226,15 +1244,37 @@ function renderPlanner() {
       </div>`;
   }).join('');
 
-  // Sidebar
+  renderSidebar();
+}
+
+let sidebarFilter = 'All';
+
+function renderSidebar() {
+  const cats = ['All', ...userCategories];
   const sidebar = document.getElementById('sidebar-list');
-  sidebar.innerHTML = recipes.map(r => `
-    <div class="sidebar-item" draggable="true"
-      ondragstart="draggedRecipeId=${r.id}"
-      ondragend="draggedRecipeId=null">
-      <div class="sidebar-item-name">${r.name}</div>
-      <div class="sidebar-item-cat">${r.category}</div>
-    </div>`).join('');
+  const filtered = sidebarFilter === 'All' ? recipes : recipes.filter(r => r.category === sidebarFilter);
+
+  const filterPills = cats.map(c => `
+    <button onclick="sidebarFilter='${c}';renderSidebar()" style="
+      padding:4px 10px;border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;
+      cursor:pointer;border:1px solid ${sidebarFilter===c ? getCatColor(c) : '#E8DDD0'};
+      background:${sidebarFilter===c ? getCatColor(c) : 'white'};
+      color:${sidebarFilter===c ? 'white' : '#8B6914'};
+      transition:all 0.15s">${c}</button>`).join('');
+
+  const items = filtered.length > 0
+    ? filtered.map(r => `
+        <div class="sidebar-item" draggable="true"
+          ondragstart="draggedRecipeId=${r.id}"
+          ondragend="draggedRecipeId=null">
+          <div class="sidebar-item-name">${r.name}</div>
+          <div class="sidebar-item-cat">${r.category}</div>
+        </div>`).join('')
+    : `<div style="text-align:center;color:#C4B090;font-size:13px;font-style:italic;padding:20px 0">No recipes in this category</div>`;
+
+  sidebar.innerHTML = `
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${filterPills}</div>
+    ${items}`;
 }
 
 function dropOnDay(e, day) {
@@ -1918,7 +1958,7 @@ async function loadFromSheets() {
     }
 
     // Pull from Sheets
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A2:G1000`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A2:I1000`;
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + syncAccessToken } });
     if (res.status === 401) { syncAccessToken = null; setSyncUI('ready'); return; }
     if (!res.ok) {
@@ -1950,7 +1990,7 @@ async function pushToSheets() {
   if (!syncAccessToken || !syncSheetId) return;
   setSyncUI('syncing');
   try {
-    const header = [['id','name','category','time','servings','tags','ingredients','modified']];
+    const header = [['id','name','category','time','servings','tags','ingredients','modified','sourceUrl']];
     const rows = recipesToRows(recipes);
     // Write timestamp in H1 alongside the header
     header[0][7] = localModified;
@@ -1958,7 +1998,7 @@ async function pushToSheets() {
 
     // Clear first
     await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A1:H5000:clear`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A1:I5000:clear`,
       { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } }
     );
 
