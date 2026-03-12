@@ -1047,7 +1047,7 @@ function openAddModal() {
 }
 
 function openEditModal() {
-  const r = recipes.find(x => x.id === detailRecipeId);
+  const r = recipes.find(x => x.id == detailRecipeId);
   if (!r) return;
   editingRecipeId = r.id;
   closeDetailModal();
@@ -1138,7 +1138,7 @@ function saveRecipe() {
 
 // ---- DETAIL MODAL ----
 function openDetail(id) {
-  const r = recipes.find(x => x.id === id);
+  const r = recipes.find(x => x.id == id); // == not === to handle string/number mismatch
   if (!r) return;
   detailRecipeId = id;
   const color = CAT_COLORS[r.category] || '#8B6914';
@@ -1173,7 +1173,7 @@ function openDetail(id) {
 function closeDetailModal() { document.getElementById('detail-modal').style.display = 'none'; detailRecipeId = null; }
 
 function addDetailToPlan() {
-  const r = recipes.find(x => x.id === detailRecipeId);
+  const r = recipes.find(x => x.id == detailRecipeId);
   if (!r) return;
   // Find first day that doesn't already have this recipe
   const day = DAYS.find(d => !(weekPlan[d] || []).find(x => x.id === r.id));
@@ -1222,7 +1222,7 @@ function renderPlanner() {
     const dayRecipes = weekPlan[day] || [];
     const chipsHtml = dayRecipes.length > 0
       ? dayRecipes.map((r, idx) => `
-          <div class="day-recipe-chip" style="cursor:pointer" onclick="openDetailModal(${r.id})">
+          <div class="day-recipe-chip" style="cursor:pointer" onclick="openDetail(${r.id})">
             <div class="day-chip-info">
               <div class="day-chip-name">${r.name}</div>
               <div class="day-chip-sub">${r.category} · ${r.time}</div>
@@ -1280,7 +1280,7 @@ function renderSidebar() {
 function dropOnDay(e, day) {
   e.currentTarget.classList.remove('drag-over');
   if (!draggedRecipeId) return;
-  const r = recipes.find(x => x.id === draggedRecipeId);
+  const r = recipes.find(x => x.id == draggedRecipeId);
   if (!r) return;
   if (!weekPlan[day]) weekPlan[day] = [];
   // Prevent duplicate on same day
