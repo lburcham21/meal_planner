@@ -1825,29 +1825,32 @@ async function loadFromSheets() {
   if (!syncAccessToken || !syncSheetId) return;
   setSyncUI('syncing');
   try {
-    // First check the metadata row (row 1 col H) for the sheet's last modified time
-    const metaRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!H1`,
-      { headers: { Authorization: 'Bearer ' + syncAccessToken } }
-    );
-
-    let sheetModified = '0';
-    if (metaRes.ok) {
-      const metaData = await metaRes.json();
-      sheetModified = (metaData.values && metaData.values[0] && metaData.values[0][0]) || '0';
+    // If we have local recipes, check timestamps to decide direction
+    if (recipes.length > 0) {
+      const metaRes = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!H1`,
+        { headers: { Authorization: 'Bearer ' + syncAccessToken } }
+      );
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        const sheetModified = (metaData.values && metaData.values[0] && metaData.values[0][0]) || '0';
+        if (localModified > sheetModified) {
+          // Local is newer — push to sheet
+          await pushToSheets();
+          await loadWeekHistoryFromSheets();
+          return;
+        }
+      }
     }
 
-    // If local data is newer than sheet, push local → sheet instead of pulling
-    if (localModified > sheetModified && recipes.length > 0) {
-      await pushToSheets();
-      return;
-    }
-
+    // Pull from Sheets
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${SYNC_TAB}!A2:G1000`;
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + syncAccessToken } });
     if (res.status === 401) { syncAccessToken = null; setSyncUI('ready'); return; }
     if (!res.ok) {
+      // Tab doesn't exist yet — push local data to create it
       await pushToSheets();
+      await loadWeekHistoryFromSheets();
       return;
     }
     const data = await res.json();
@@ -1856,9 +1859,9 @@ async function loadFromSheets() {
       recipes = rowsToRecipes(rows);
       localStorage.setItem('bp-recipes', JSON.stringify(recipes));
       renderRecipes();
-    } else {
+    } else if (recipes.length > 0) {
+      // Sheet is empty but we have local recipes — push them
       await pushToSheets();
-      return;
     }
     setSyncUI('synced');
     await loadWeekHistoryFromSheets();
