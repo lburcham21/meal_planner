@@ -2003,7 +2003,8 @@ function manualSignIn() {
     return;
   }
 
-  const redirectUri = location.origin + location.pathname;
+  // Use a minimal redirect page hosted on GitHub as the OAuth target
+  const redirectUri = 'https://lburcham21.github.io/meal_planner/oauth.html';
   const scope = 'https://www.googleapis.com/auth/spreadsheets';
   const url = 'https://accounts.google.com/o/oauth2/v2/auth' +
     '?client_id=' + encodeURIComponent(syncClientId) +
@@ -2012,7 +2013,47 @@ function manualSignIn() {
     '&scope=' + encodeURIComponent(scope) +
     '&prompt=select_account';
 
-  window.location.href = url;
+  document.getElementById('signin-status').textContent = 'Opening Google sign-in…';
+  document.getElementById('signin-btn').style.display = 'none';
+
+  const popup = window.open(url, 'oauth', 'width=500,height=650,left=200,top=100');
+  if (!popup) {
+    document.getElementById('signin-status').textContent = 'Popup blocked — please allow popups for this site and try again';
+    document.getElementById('signin-btn').style.display = 'inline-block';
+    return;
+  }
+
+  // Listen for message from oauth.html popup
+  window.addEventListener('message', function handler(e) {
+    if (e.origin !== 'https://lburcham21.github.io') return;
+    if (e.data && e.data.access_token) {
+      window.removeEventListener('message', handler);
+      popup.close();
+      syncAccessToken = e.data.access_token;
+      hideGate();
+      setSyncUI('syncing');
+      document.getElementById('sync-step-setup').style.display = 'none';
+      document.getElementById('sync-step-connected').style.display = 'block';
+      loadFromSheets();
+      pushCategoriesToSheets();
+    }
+    if (e.data && e.data.error) {
+      window.removeEventListener('message', handler);
+      document.getElementById('signin-status').textContent = 'Sign in failed: ' + e.data.error;
+      document.getElementById('signin-btn').style.display = 'inline-block';
+    }
+  });
+
+  // Detect if popup was closed without completing
+  const checkClosed = setInterval(() => {
+    if (popup.closed) {
+      clearInterval(checkClosed);
+      if (!syncAccessToken) {
+        document.getElementById('signin-status').textContent = 'Sign in cancelled';
+        document.getElementById('signin-btn').style.display = 'inline-block';
+      }
+    }
+  }, 500);
 }
 
 function startGoogleSignIn() {
