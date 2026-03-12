@@ -1,8 +1,9 @@
 {
-  "name": "The Bakery Planner",
-  "short_name": "Bakery Planner",
+  "name": "Weekly Meal Plan",
+  "short_name": "Meal Plan",
   "description": "Recipe collection, weekly meal planner and shopping list",
-  "start_url": "./bakery-planner.html",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#FAF7F2",
   "theme_color": "#2C1810",
