@@ -1119,6 +1119,9 @@ function deleteDetailRecipe() {
     if (weekPlan[d]) weekPlan[d] = weekPlan[d].filter(r => r.id !== detailRecipeId);
   });
   save();
+  // Push immediately so delete is in Sheets before anything can overwrite it
+  clearTimeout(syncDebounce);
+  pushToSheets();
   closeDetailModal();
   renderRecipes();
   showToast('Recipe deleted.');
