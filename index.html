@@ -601,7 +601,11 @@
       </div>
       <div>
         <div class="field-label">TAGS (COMMA SEPARATED)</div>
-        <input class="field-input" id="f-tags" placeholder="e.g. bread, savory, yeast" style="font-family:'DM Mono',monospace" />
+        <input class="field-input" id="f-tags" placeholder="e.g. quick, gluten-free" style="font-family:'DM Mono',monospace" />
+      </div>
+      <div>
+        <div class="field-label">SOURCE URL (OPTIONAL)</div>
+        <input class="field-input" id="f-source-url" placeholder="https://…" style="font-family:'DM Mono',monospace;font-size:12px" />
       </div>
       <div>
         <div class="field-label">INGREDIENTS</div>
@@ -619,6 +623,7 @@
     <div id="detail-header-content"></div>
     <div class="detail-body">
       <div id="detail-tags-row" class="detail-tags"></div>
+      <div id="detail-source-url" style="padding:0 0 8px 0;display:none"></div>
       <div class="ing-label">INGREDIENTS</div>
       <div class="ing-list" id="detail-ing-list"></div>
       <div class="detail-actions">
@@ -1023,6 +1028,7 @@ function openAddModal() {
   document.getElementById('f-time').value = '';
   document.getElementById('f-servings').value = '';
   document.getElementById('f-tags').value = '';
+  document.getElementById('f-source-url').value = '';
   document.getElementById('ing-fields').innerHTML = `
     <div class="ing-row">
       <input class="field-input ing-item" placeholder="Ingredient name" />
@@ -1043,6 +1049,7 @@ function openEditModal() {
   document.getElementById('f-servings').value = r.servings || '';
   document.getElementById('f-tags').value = (r.tags || []).join(', ');
   populateCategoryDropdown(r.category || userCategories[0] || 'Breakfast');
+  document.getElementById('f-source-url').value = r.sourceUrl || '';
   // Populate ingredient rows
   const fields = document.getElementById('ing-fields');
   fields.innerHTML = (r.ingredients.length ? r.ingredients : [{ item: '', amount: '' }]).map(() => `
@@ -1084,7 +1091,8 @@ function saveRecipe() {
     time: document.getElementById('f-time').value,
     servings: parseInt(document.getElementById('f-servings').value) || 4,
     tags: document.getElementById('f-tags').value.split(',').map(t => t.trim()).filter(Boolean),
-    ingredients
+    ingredients,
+    sourceUrl: document.getElementById('f-source-url').value.trim()
   };
 
   if (editingRecipeId) {
@@ -1132,6 +1140,16 @@ function openDetail(id) {
       <span class="ing-item-name">${ing.item}</span>
       <span class="ing-item-amount">${ing.amount}</span>
     </div>`).join('');
+  // Show source URL if present
+  const sourceEl = document.getElementById('detail-source-url');
+  if (sourceEl) {
+    if (r.sourceUrl) {
+      sourceEl.innerHTML = `<a href="${r.sourceUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.8">🔗 View original recipe</a>`;
+      sourceEl.style.display = 'block';
+    } else {
+      sourceEl.style.display = 'none';
+    }
+  }
   document.getElementById('detail-modal').style.display = 'flex';
 }
 function closeDetailModal() { document.getElementById('detail-modal').style.display = 'none'; detailRecipeId = null; }
@@ -1796,13 +1814,15 @@ function showImportPreview(recipe) {
 
 function saveImportedRecipe() {
   if (!importedRecipeData) return;
+  const importUrl = document.getElementById('import-url') ? document.getElementById('import-url').value.trim() : '';
   const recipe = {
     ...importedRecipeData,
     id: Date.now(),
     servings: parseInt(importedRecipeData.servings) || 4,
     tags: Array.isArray(importedRecipeData.tags) ? importedRecipeData.tags : [],
     ingredients: Array.isArray(importedRecipeData.ingredients) ? importedRecipeData.ingredients : [],
-    category: importedRecipeData.category || 'Bread',
+    category: importedRecipeData.category || 'Breakfast',
+    sourceUrl: importedRecipeData.sourceUrl || importUrl || '',
   };
   recipes.push(recipe);
   save();
@@ -1859,18 +1879,19 @@ function syncSignOut() {
 function recipesToRows(arr) {
   return arr.map(r => [
     r.id, r.name, r.category, r.time || '', r.servings || 4,
-    (r.tags || []).join(', '), JSON.stringify(r.ingredients || [])
+    (r.tags || []).join(', '), JSON.stringify(r.ingredients || []), '', r.sourceUrl || ''
   ]);
 }
 function rowsToRecipes(rows) {
   return rows.filter(r => r[0] && r[1]).map(r => ({
     id: Number(r[0]) || Date.now(),
     name: r[1] || '',
-    category: r[2] || 'Bread',
+    category: r[2] || 'Breakfast',
     time: r[3] || '',
     servings: parseInt(r[4]) || 4,
     tags: r[5] ? r[5].split(',').map(t => t.trim()).filter(Boolean) : [],
-    ingredients: (() => { try { return JSON.parse(r[6] || '[]'); } catch { return []; } })()
+    ingredients: (() => { try { return JSON.parse(r[6] || '[]'); } catch { return []; } })(),
+    sourceUrl: r[8] || ''
   }));
 }
 
