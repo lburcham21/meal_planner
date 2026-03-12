@@ -645,14 +645,10 @@
 
     <!-- Step 1: Enter details -->
     <div id="sync-step-setup">
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:20px">
         <div class="field-label">SPREADSHEET ID</div>
         <input class="field-input" id="sync-sheet-id" placeholder="Paste the ID from your Google Sheet URL" style="font-family:'DM Mono',monospace;font-size:12px" />
         <div style="font-size:11px;color:#C4B090;margin-top:5px;font-family:'DM Mono',monospace">Found between /d/ and /edit in the sheet URL</div>
-      </div>
-      <div style="margin-bottom:20px">
-        <div class="field-label">GOOGLE CLIENT ID</div>
-        <input class="field-input" id="sync-client-id" placeholder="Paste your OAuth Client ID" style="font-family:'DM Mono',monospace;font-size:12px" />
       </div>
       <button onclick="startGoogleSignIn()" style="width:100%;background:#2C1810;color:#F5E6C8;padding:13px;border-radius:10px;font-size:14px;font-family:'DM Mono',monospace;border:none;cursor:pointer;margin-bottom:16px">Sign in with Google →</button>
 
@@ -1811,7 +1807,7 @@ function saveImportedRecipe() {
 
 // ---- GOOGLE SHEETS SYNC ----
 let syncSheetId = localStorage.getItem('bp-sync-sheet-id') || '';
-let syncClientId = localStorage.getItem('bp-sync-client-id') || '';
+let syncClientId = '619857766369-vgma3260c47662sdsouq3gtckevnb1pq.apps.googleusercontent.com';
 let syncAccessToken = null;
 let syncDebounce = null;
 const SYNC_TAB = 'Recipes';
@@ -1837,7 +1833,6 @@ function setSyncUI(state) {
 
 function openSyncModal() {
   document.getElementById('sync-sheet-id').value = syncSheetId;
-  document.getElementById('sync-client-id').value = syncClientId;
   const connected = !!syncAccessToken;
   document.getElementById('sync-step-setup').style.display = connected ? 'none' : 'block';
   document.getElementById('sync-step-connected').style.display = connected ? 'block' : 'none';
@@ -2058,12 +2053,9 @@ function manualSignIn() {
 
 function startGoogleSignIn() {
   const sheetId = document.getElementById('sync-sheet-id').value.trim();
-  const clientId = document.getElementById('sync-client-id').value.trim();
-  if (!sheetId || !clientId) { showToast('Please fill in both fields'); return; }
+  if (!sheetId) { showToast('Please paste your Spreadsheet ID'); return; }
   syncSheetId = sheetId;
-  syncClientId = clientId;
   localStorage.setItem('bp-sync-sheet-id', syncSheetId);
-  localStorage.setItem('bp-sync-client-id', syncClientId);
   closeSyncModal();
   manualSignIn();
 }
