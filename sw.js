@@ -1,4 +1,4 @@
-const CACHE = 'bakery-planner-v1';
+const CACHE = 'meal-planner-v3';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -22,17 +22,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Network-first: always try to get fresh content, fall back to cache
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        // Cache successful GET requests
-        if (e.request.method === 'GET' && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => caches.match('./index.html'));
+    fetch(e.request).then(response => {
+      if (e.request.method === 'GET' && response.status === 200) {
+        const clone = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+      }
+      return response;
+    }).catch(() => {
+      // Network failed — serve from cache
+      return caches.match(e.request).then(cached => cached || caches.match('./index.html'));
     })
   );
 });
