@@ -1788,7 +1788,7 @@ The JSON must have exactly these fields:
   "ingredients": [{"item": "ingredient name", "amount": "quantity"}]
 }
 
-For tags, always include the primary protein as the first tag — one of: Chicken, Beef, Pork, Seafood, Vegetarian. Then add 2-3 other relevant descriptive tags (e.g. quick, one-pot, spicy).
+For tags, include ONLY the primary protein as a single tag — one of: Chicken, Beef, Pork, Seafood, Vegetarian. No other tags.
 If any field is unknown, use a sensible default. Return ONLY the JSON object.`;
 
     setLoadingStep(2);
