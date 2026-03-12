@@ -1970,9 +1970,17 @@ async function loadFromSheets() {
     const data = await res.json();
     const rows = data.values || [];
     if (rows.length > 0) {
-      recipes = rowsToRecipes(rows);
+      const pulled = rowsToRecipes(rows);
+      // Preserve sourceUrl from local recipes since sheet may not have column I yet
+      const localRecipes = JSON.parse(localStorage.getItem('bp-recipes') || '[]');
+      recipes = pulled.map(r => {
+        const local = localRecipes.find(lr => lr.id === r.id);
+        return { ...r, sourceUrl: r.sourceUrl || (local && local.sourceUrl) || '' };
+      });
       localStorage.setItem('bp-recipes', JSON.stringify(recipes));
       renderRecipes();
+      // Push back to sheet to migrate column I
+      await pushToSheets();
     } else if (recipes.length > 0) {
       // Sheet is empty but we have local recipes — push them
       await pushToSheets();
