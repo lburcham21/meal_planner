@@ -113,6 +113,31 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 20px;
     }
+    #recipe-grid.list-view {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    #recipe-grid.list-view .recipe-card {
+      display: flex; flex-direction: row; border-radius: 10px;
+    }
+    #recipe-grid.list-view .card-header {
+      width: 120px; min-width: 120px; padding: 14px 16px; display: flex;
+      flex-direction: column; justify-content: center; border-radius: 10px 0 0 10px;
+    }
+    #recipe-grid.list-view .card-emoji { font-size: 36px; right: -4px; bottom: -4px; }
+    #recipe-grid.list-view .card-name { font-size: 14px; }
+    #recipe-grid.list-view .card-cat { font-size: 9px; }
+    #recipe-grid.list-view .card-body {
+      flex: 1; padding: 12px 16px; display: flex; align-items: center; gap: 16px;
+    }
+    #recipe-grid.list-view .card-meta { margin-bottom: 0; flex-wrap: wrap; gap: 10px; }
+    #recipe-grid.list-view .card-tags { margin-top: 0; }
+    .view-toggle-btn {
+      background: none; border: 1px solid #E8DDD0; color: #8B6914;
+      padding: 7px 12px; border-radius: 7px; font-size: 15px; cursor: pointer;
+      transition: all 0.15s; line-height: 1;
+    }
+    .view-toggle-btn:hover, .view-toggle-btn.active { background: #F5ECD8; border-color: #C8A96A; }
     .recipe-card {
       background: white; border-radius: 12px; overflow: hidden;
       box-shadow: 0 4px 16px rgba(44,24,16,0.08); border: 1px solid #F0E8D8;
@@ -490,7 +515,8 @@
         <div class="page-title">Recipe Collection</div>
         <div class="page-sub" id="recipe-count">0 recipes saved</div>
       </div>
-      <div style="display:flex;gap:10px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="view-toggle-btn" id="view-toggle-btn" onclick="toggleRecipeView()" title="Toggle list/card view">⊞</button>
         <button class="btn btn-outline" onclick="openImportModal()">⬇ Import Recipe</button>
         <button class="btn btn-dark" onclick="openAddModal()">+ Add Recipe</button>
       </div>
@@ -808,14 +834,14 @@
 
 <script>
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const DEFAULT_CATEGORIES = ["Bread","Quick Bread","Cookies","Pastry","Muffins","Cake","Pie","Children's Snacks","Breakfast","Lunch","Dinner","Soup","Salad","Snack"];
+const DEFAULT_CATEGORIES = ["Breakfast","Lunch","Dinner","Kid Snacks"];
 let userCategories = JSON.parse(localStorage.getItem('bp-categories') || 'null') || [...DEFAULT_CATEGORIES];
 function getCategories() { return ["All", ...userCategories]; }
-const CAT_COLORS = { Bread:"#8B6914","Quick Bread":"#A0522D",Cookies:"#B8860B",Pastry:"#CD853F",Muffins:"#D2691E",Cake:"#BC8F5F",Pie:"#C19A6B","Children's Snacks":"#5B9E6B",Breakfast:"#C47B2B",Lunch:"#7A9E4E",Dinner:"#5B7EA6",Soup:"#9E6B3F",Salad:"#6BAF7A",Snack:"#C4906B" };
-const CAT_EMOJI = { Bread:"🍞","Quick Bread":"🍞",Cookies:"🍪",Pastry:"🥐",Muffins:"🧁",Cake:"🎂",Pie:"🥧","Children's Snacks":"🐣",Breakfast:"🍳",Lunch:"🥙",Dinner:"🍽",Soup:"🍲",Salad:"🥗",Snack:"🍎" };
+const CAT_COLORS = { Breakfast:"#C47B2B", Lunch:"#7A9E4E", Dinner:"#5B7EA6", "Kid Snacks":"#5B9E6B" };
+const CAT_EMOJI = { Breakfast:"🍳", Lunch:"🥙", Dinner:"🍽", "Kid Snacks":"🐣" };
 function getCatColor(cat) { return CAT_COLORS[cat] || '#8B6914'; }
 function getCatEmoji(cat) { return CAT_EMOJI[cat] || '🥘'; }
-function saveCategories() { localStorage.setItem('bp-categories', JSON.stringify(userCategories)); }
+function saveCategories() { localStorage.setItem('bp-categories', JSON.stringify(userCategories)); pushCategoriesToSheets(); }
 
 const INITIAL_RECIPES = [];
 
@@ -833,6 +859,23 @@ for (const day of DAYS) {
 }
 let selectedCategory = "All";
 let selectedTags = new Set();
+let recipeView = localStorage.getItem('bp-view') || 'card'; // 'card' or 'list'
+
+function toggleRecipeView() {
+  recipeView = recipeView === 'card' ? 'list' : 'card';
+  localStorage.setItem('bp-view', recipeView);
+  const grid = document.getElementById('recipe-grid');
+  const btn = document.getElementById('view-toggle-btn');
+  if (recipeView === 'list') {
+    grid.classList.add('list-view');
+    btn.textContent = '☰';
+    btn.classList.add('active');
+  } else {
+    grid.classList.remove('list-view');
+    btn.textContent = '⊞';
+    btn.classList.remove('active');
+  }
+}
 let detailRecipeId = null;
 let draggedRecipeId = null;
 let ingCount = 1;
@@ -904,6 +947,16 @@ function renderRecipes() {
   const query = document.getElementById('search-input').value.toLowerCase();
   const grid = document.getElementById('recipe-grid');
   document.getElementById('recipe-count').textContent = recipes.length + ' recipes saved';
+
+  // Apply saved view
+  const btn = document.getElementById('view-toggle-btn');
+  if (recipeView === 'list') {
+    grid.classList.add('list-view');
+    if (btn) { btn.textContent = '☰'; btn.classList.add('active'); }
+  } else {
+    grid.classList.remove('list-view');
+    if (btn) { btn.textContent = '⊞'; btn.classList.remove('active'); }
+  }
 
   // Category filter pills
   const pillsEl = document.getElementById('filter-pills');
@@ -1865,6 +1918,7 @@ async function loadFromSheets() {
     }
     setSyncUI('synced');
     await loadWeekHistoryFromSheets();
+    await loadCategoriesFromSheets();
   } catch(e) {
     console.error('Sheets load error', e);
     setSyncUI('error');
@@ -1907,6 +1961,7 @@ async function pushToSheets() {
       throw new Error('Write failed: ' + JSON.stringify(err));
     }
     setSyncUI('synced');
+    pushCategoriesToSheets();
   } catch(e) {
     console.error('Sheets push error', e);
     setSyncUI('error');
@@ -2163,6 +2218,51 @@ function deleteWeekFromHistory(weekOf) {
   pushWeekPlanToSheets();
   renderWeekHistory();
   showToast('Week deleted');
+}
+
+// ---- CATEGORIES SHEETS SYNC ----
+const CATS_TAB = 'Categories';
+async function pushCategoriesToSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const values = [['category'], ...userCategories.map(c => [c])];
+    const clearRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${CATS_TAB}!A1:A200:clear`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } }
+    );
+    const writeRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${CATS_TAB}!A1?valueInputOption=RAW`,
+      { method: 'PUT', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+    );
+    if (!writeRes.ok) {
+      const err = await writeRes.json();
+      if (err.error && err.error.message && err.error.message.includes('Unable to parse range')) {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests: [{ addSheet: { properties: { title: CATS_TAB } } }] })
+        });
+        await pushCategoriesToSheets();
+      }
+    }
+  } catch(e) { console.error('Categories sync error', e); }
+}
+
+async function loadCategoriesFromSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${CATS_TAB}!A2:A200`,
+      { headers: { Authorization: 'Bearer ' + syncAccessToken } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = data.values || [];
+    if (rows.length === 0) return;
+    userCategories = rows.map(r => r[0]).filter(Boolean);
+    localStorage.setItem('bp-categories', JSON.stringify(userCategories));
+    renderRecipes();
+  } catch(e) { console.error('Categories load error', e); }
 }
 
 // ---- SERVICE WORKER ----
