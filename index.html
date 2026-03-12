@@ -602,14 +602,6 @@
       <div>
         <div class="field-label">TAGS (COMMA SEPARATED)</div>
         <input class="field-input" id="f-tags" placeholder="e.g. chicken, quick, gluten-free" style="font-family:'DM Mono',monospace" />
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-          <div style="font-size:10px;font-family:'DM Mono',monospace;color:#C4B090;padding-top:3px">PROTEIN:</div>
-          ${['Chicken','Beef','Pork','Seafood','Vegetarian','Other'].map(p => `
-            <button type="button" onclick="addProteinTag('${p}')" style="
-              padding:3px 10px;border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;
-              cursor:pointer;border:1px solid #E8DDD0;background:white;color:#8B6914;transition:all 0.15s"
-              onmouseover="this.style.background='#F5ECD8'" onmouseout="this.style.background='white'">${p}</button>`).join('')}
-        </div>
       </div>
       <div>
         <div class="field-label">SOURCE URL (OPTIONAL)</div>
@@ -1789,13 +1781,14 @@ async function runImport(mode) {
 The JSON must have exactly these fields:
 {
   "name": "Recipe Name",
-  "category": one of ["Bread","Quick Bread","Cookies","Pastry","Muffins","Cake","Pie","Children's Snacks","Other"],
+  "category": one of ["Breakfast","Lunch","Dinner","Kid Snacks"],
   "time": "e.g. 45m or 2h 30m",
   "servings": number,
   "tags": ["tag1","tag2"],
   "ingredients": [{"item": "ingredient name", "amount": "quantity"}]
 }
 
+For tags, always include the primary protein as the first tag — one of: Chicken, Beef, Pork, Seafood, Vegetarian. Then add 2-3 other relevant descriptive tags (e.g. quick, one-pot, spicy).
 If any field is unknown, use a sensible default. Return ONLY the JSON object.`;
 
     setLoadingStep(2);
