@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Bakery Planner</title>
+  <title>Weekly Meal Plan</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#2C1810" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -456,7 +456,7 @@
 <!-- SIGN-IN GATE -->
 <div id="signin-gate" style="display:none;position:fixed;inset:0;background:#FAF7F2;z-index:999;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center">
   <div style="font-size:52px;margin-bottom:16px">🥐</div>
-  <div style="font-size:26px;font-weight:700;color:#2C1810;font-family:'Lora',serif;margin-bottom:8px">The Bakery Planner</div>
+  <div style="font-size:26px;font-weight:700;color:#2C1810;font-family:'Lora',serif;margin-bottom:8px">Weekly Meal Plan</div>
   <div style="font-size:14px;color:#8B6914;font-style:italic;margin-bottom:40px">Sign in to access your recipes</div>
   <div id="signin-status" style="font-size:13px;color:#C4B090;font-family:'DM Mono',monospace;margin-bottom:24px">Connecting to Google…</div>
   <button id="signin-btn" onclick="manualSignIn()" style="display:none;background:#2C1810;color:#F5E6C8;padding:14px 32px;border-radius:10px;font-size:15px;font-family:'DM Mono',monospace;border:none;cursor:pointer">
@@ -466,7 +466,7 @@
   <div class="logo">
     <span style="font-size:24px">🥐</span>
     <div>
-      <div class="logo-title">The Bakery Planner</div>
+      <div class="logo-title">Weekly Meal Plan</div>
       <div class="logo-sub">RECIPE &amp; MEAL ORGANIZER</div>
     </div>
   </div>
@@ -502,6 +502,10 @@
       </div>
       <div class="filter-pills" id="filter-pills"></div>
     </div>
+    <div class="search-row" style="padding-top:0">
+      <div style="font-size:11px;font-family:'DM Mono',monospace;color:#C4B090;padding:2px 4px;white-space:nowrap">TAGS:</div>
+      <div class="filter-pills" id="tag-filter-pills" style="flex-wrap:wrap"></div>
+    </div>
     <div id="recipe-grid"></div>
   </div>
 
@@ -514,6 +518,8 @@
       </div>
       <div style="display:flex;gap:12px">
         <button class="btn btn-outline" onclick="clearWeek()">Clear Week</button>
+        <button class="btn btn-outline" onclick="openWeekHistoryModal()">📅 History</button>
+        <button class="btn btn-gold" onclick="saveCurrentWeekToHistory()">💾 Save Week</button>
         <button class="btn btn-outline" onclick="openAutopickModal()">⚙ Customise Autopick</button>
         <button class="btn btn-gold" onclick="autoPickWeek()">✨ Autopick Week</button>
       </div>
@@ -555,12 +561,8 @@
       </div>
       <div class="three-col">
         <div>
-          <div class="field-label">CATEGORY</div>
-          <select class="field-input field-select" id="f-category">
-            <option>Bread</option><option>Quick Bread</option><option>Cookies</option>
-            <option>Pastry</option><option>Muffins</option><option>Cake</option><option>Pie</option>
-            <option>Children's Snacks</option>
-          </select>
+          <div class="field-label">CATEGORY <button onclick="openManageCatsModal()" style="background:none;border:none;color:#C8A96A;font-size:10px;font-family:'DM Mono',monospace;cursor:pointer;margin-left:6px">+ Manage</button></div>
+          <select class="field-input field-select" id="f-category"></select>
         </div>
         <div>
           <div class="field-label">TIME</div>
@@ -774,11 +776,45 @@
   </div>
 </div>
 
+<!-- MANAGE CATEGORIES MODAL -->
+<div id="manage-cats-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeManageCatsModal()">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Manage Categories</div>
+      <button class="close-btn" onclick="closeManageCatsModal()">×</button>
+    </div>
+    <div id="manage-cats-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px">
+      <input class="field-input" id="new-cat-input" placeholder="New category name…" style="flex:1" onkeydown="if(event.key==='Enter')addCat()" />
+      <button onclick="addCat()" style="background:#2C1810;color:#F5E6C8;border:none;padding:10px 16px;border-radius:8px;font-family:'DM Mono',monospace;font-size:13px;cursor:pointer">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- WEEK HISTORY MODAL -->
+<div id="week-history-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeWeekHistoryModal()">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📅 Week History</div>
+        <div style="font-size:13px;color:#8B6914;font-style:italic;margin-top:4px">Load a previous week plan</div>
+      </div>
+      <button class="close-btn" onclick="closeWeekHistoryModal()">×</button>
+    </div>
+    <div id="week-history-list" style="max-height:460px;overflow-y:auto"></div>
+  </div>
+</div>
+
 <script>
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const CATEGORIES = ["All","Bread","Quick Bread","Cookies","Pastry","Muffins","Cake","Pie","Children's Snacks"];
-const CAT_COLORS = { Bread:"#8B6914","Quick Bread":"#A0522D",Cookies:"#B8860B",Pastry:"#CD853F",Muffins:"#D2691E",Cake:"#BC8F5F",Pie:"#C19A6B","Children's Snacks":"#5B9E6B" };
-const CAT_EMOJI = { Bread:"🍞","Quick Bread":"🍞",Cookies:"🍪",Pastry:"🥐",Muffins:"🧁",Cake:"🎂",Pie:"🥧","Children's Snacks":"🐣" };
+const DEFAULT_CATEGORIES = ["Bread","Quick Bread","Cookies","Pastry","Muffins","Cake","Pie","Children's Snacks","Breakfast","Lunch","Dinner","Soup","Salad","Snack"];
+let userCategories = JSON.parse(localStorage.getItem('bp-categories') || 'null') || [...DEFAULT_CATEGORIES];
+function getCategories() { return ["All", ...userCategories]; }
+const CAT_COLORS = { Bread:"#8B6914","Quick Bread":"#A0522D",Cookies:"#B8860B",Pastry:"#CD853F",Muffins:"#D2691E",Cake:"#BC8F5F",Pie:"#C19A6B","Children's Snacks":"#5B9E6B",Breakfast:"#C47B2B",Lunch:"#7A9E4E",Dinner:"#5B7EA6",Soup:"#9E6B3F",Salad:"#6BAF7A",Snack:"#C4906B" };
+const CAT_EMOJI = { Bread:"🍞","Quick Bread":"🍞",Cookies:"🍪",Pastry:"🥐",Muffins:"🧁",Cake:"🎂",Pie:"🥧","Children's Snacks":"🐣",Breakfast:"🍳",Lunch:"🥙",Dinner:"🍽",Soup:"🍲",Salad:"🥗",Snack:"🍎" };
+function getCatColor(cat) { return CAT_COLORS[cat] || '#8B6914'; }
+function getCatEmoji(cat) { return CAT_EMOJI[cat] || '🥘'; }
+function saveCategories() { localStorage.setItem('bp-categories', JSON.stringify(userCategories)); }
 
 const INITIAL_RECIPES = [];
 
@@ -795,14 +831,17 @@ for (const day of DAYS) {
   }
 }
 let selectedCategory = "All";
+let selectedTags = new Set();
 let detailRecipeId = null;
 let draggedRecipeId = null;
 let ingCount = 1;
+let weekHistory = JSON.parse(localStorage.getItem('bp-history') || '[]'); // [{weekOf, plan:{day:[{id,name}]}}]
 
 function save() {
   localStorage.setItem('bp-recipes', JSON.stringify(recipes));
   localStorage.setItem('bp-week', JSON.stringify(weekPlan));
   localStorage.setItem('bp-extras', JSON.stringify(extraItems));
+  localStorage.setItem('bp-history', JSON.stringify(weekHistory));
   scheduleSync();
 }
 
@@ -820,22 +859,68 @@ function switchView(view) {
   if (view === 'shopping') renderShopping();
 }
 
+// ---- WEEK HISTORY ----
+function getLastMadeDateForRecipe(recipeId) {
+  for (let i = weekHistory.length - 1; i >= 0; i--) {
+    const plan = weekHistory[i].plan;
+    for (const day of DAYS) {
+      if (plan[day] && plan[day].some(r => r.id === recipeId)) {
+        return weekHistory[i].weekOf;
+      }
+    }
+  }
+  return null;
+}
+
+function getLastMadeHtml(recipeId) {
+  const date = getLastMadeDateForRecipe(recipeId);
+  if (!date) return '';
+  const d = new Date(date);
+  const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `<div style="font-size:11px;color:#6BAF7A;font-family:'DM Mono',monospace;margin-top:4px">Last made: ${label}</div>`;
+}
+
+function saveCurrentWeekToHistory() {
+  const hasRecipes = DAYS.some(d => weekPlan[d] && weekPlan[d].length > 0);
+  if (!hasRecipes) return;
+  const weekOf = new Date().toISOString().split('T')[0];
+  // Replace existing entry for same week or add new
+  const idx = weekHistory.findIndex(h => h.weekOf === weekOf);
+  const entry = { weekOf, plan: {} };
+  DAYS.forEach(d => { entry.plan[d] = (weekPlan[d] || []).map(r => ({ id: r.id, name: r.name })); });
+  if (idx >= 0) { weekHistory[idx] = entry; } else { weekHistory.push(entry); }
+  // Keep last 52 weeks
+  if (weekHistory.length > 52) weekHistory = weekHistory.slice(-52);
+  save();
+  pushWeekPlanToSheets();
+}
+
 // ---- RECIPES ----
 function renderRecipes() {
   const query = document.getElementById('search-input').value.toLowerCase();
   const grid = document.getElementById('recipe-grid');
   document.getElementById('recipe-count').textContent = recipes.length + ' recipes saved';
 
-  // Filter pills
+  // Category filter pills
   const pillsEl = document.getElementById('filter-pills');
-  pillsEl.innerHTML = CATEGORIES.map(cat =>
+  pillsEl.innerHTML = getCategories().map(cat =>
     `<button class="filter-pill ${cat === selectedCategory ? 'active' : ''}" onclick="setCategory('${cat}')">${cat}</button>`
   ).join('');
 
+  // Tag filter pills
+  const allTags = [...new Set(recipes.flatMap(r => r.tags || []))].sort();
+  const tagPillsEl = document.getElementById('tag-filter-pills');
+  if (tagPillsEl) {
+    tagPillsEl.innerHTML = allTags.map(tag =>
+      `<button class="filter-pill tag-pill-filter ${selectedTags.has(tag) ? 'active' : ''}" onclick="toggleTag('${tag}')">${tag}</button>`
+    ).join('');
+  }
+
   const filtered = recipes.filter(r => {
     const matchCat = selectedCategory === 'All' || r.category === selectedCategory;
-    const matchSearch = r.name.toLowerCase().includes(query) || r.tags.some(t => t.toLowerCase().includes(query));
-    return matchCat && matchSearch;
+    const matchSearch = r.name.toLowerCase().includes(query) || (r.tags||[]).some(t => t.toLowerCase().includes(query));
+    const matchTags = selectedTags.size === 0 || [...selectedTags].every(t => (r.tags||[]).includes(t));
+    return matchCat && matchSearch && matchTags;
   });
 
   if (filtered.length === 0) {
@@ -848,8 +933,8 @@ function renderRecipes() {
       ondragstart="draggedRecipeId=${r.id}"
       ondragend="draggedRecipeId=null"
       onclick="openDetail(${r.id})">
-      <div class="card-header" style="background:${CAT_COLORS[r.category]||'#8B6914'}">
-        <div class="card-emoji">${CAT_EMOJI[r.category]||'🥐'}</div>
+      <div class="card-header" style="background:${getCatColor(r.category)}">
+        <div class="card-emoji">${getCatEmoji(r.category)}</div>
         <div class="card-cat">${r.category.toUpperCase()}</div>
         <div class="card-name">${r.name}</div>
       </div>
@@ -860,6 +945,7 @@ function renderRecipes() {
           <span>🧂 ${r.ingredients.length} ingredients</span>
         </div>
         <div class="card-tags">${r.tags.slice(0,3).map(t=>`<span class="tag-pill">${t}</span>`).join('')}</div>
+        ${getLastMadeHtml(r.id)}
       </div>
     </div>
   `).join('');
@@ -869,15 +955,25 @@ function setCategory(cat) {
   selectedCategory = cat;
   renderRecipes();
 }
+function toggleTag(tag) {
+  if (selectedTags.has(tag)) { selectedTags.delete(tag); } else { selectedTags.add(tag); }
+  renderRecipes();
+}
 
 // ---- ADD / EDIT RECIPE ----
 let editingRecipeId = null;
+
+function populateCategoryDropdown(selected) {
+  const sel = document.getElementById('f-category');
+  sel.innerHTML = userCategories.map(c => `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join('');
+}
 
 function openAddModal() {
   editingRecipeId = null;
   document.getElementById('add-modal-title').textContent = 'New Recipe';
   document.getElementById('save-recipe-btn').textContent = 'Save Recipe';
   document.getElementById('f-name').value = '';
+  populateCategoryDropdown();
   document.getElementById('f-time').value = '';
   document.getElementById('f-servings').value = '';
   document.getElementById('f-tags').value = '';
@@ -1048,7 +1144,7 @@ function renderPlanner() {
               <div class="day-chip-sub">${r.category} · ${r.time}</div>
             </div>
             <div class="day-chip-actions">
-              <div class="day-dot" style="background:${CAT_COLORS[r.category]||'#C8A96A'}"></div>
+              <div class="day-dot" style="background:${getCatColor(r.category)}"></div>
               <button class="remove-chip" onclick="removeFromDay('${day}',${idx})" title="Remove">×</button>
             </div>
           </div>`).join('')
@@ -1108,13 +1204,18 @@ function clearWeek() {
 }
 
 function autoPickWeek() {
-  // If custom prefs exist with a total > 0, use them; otherwise random fill
   const total = Object.values(autopickPrefs).reduce((s, v) => s + v, 0);
   if (total > 0) { runCustomAutopick(); return; }
   if (recipes.length === 0) return;
   DAYS.forEach(d => { weekPlan[d] = []; });
-  const shuffled = [...recipes].sort(() => Math.random() - 0.5);
-  DAYS.forEach((day, i) => { weekPlan[day] = [shuffled[i % shuffled.length]]; });
+  // Smart pick: score recipes by how long ago they were last made
+  const now = Date.now();
+  const scored = recipes.map(r => {
+    const lastDate = getLastMadeDateForRecipe(r.id);
+    const daysSince = lastDate ? (now - new Date(lastDate).getTime()) / 86400000 : 365;
+    return { r, score: daysSince + Math.random() * 7 };
+  }).sort((a, b) => b.score - a.score);
+  DAYS.forEach((day, i) => { weekPlan[day] = [scored[i % scored.length].r]; });
   save();
   renderPlanner();
   updateShoppingBadge();
@@ -1138,7 +1239,7 @@ function renderAutopickRows() {
   rows.innerHTML = usedCats.map(cat => {
     const count = autopickPrefs[cat] || 0;
     const available = recipes.filter(r => r.category === cat).length;
-    const color = CAT_COLORS[cat] || '#8B6914';
+    const color = getCatColor(cat);
     const safeId = cat.replace(/[^a-zA-Z0-9]/g, '_');
     return `
       <div class="autopick-row" id="aprow-${safeId}">
@@ -1737,6 +1838,7 @@ async function loadFromSheets() {
       return;
     }
     setSyncUI('synced');
+    await loadWeekHistoryFromSheets();
   } catch(e) {
     console.error('Sheets load error', e);
     setSyncUI('error');
@@ -1820,9 +1922,6 @@ function manualSignIn() {
     openSyncModal();
     return;
   }
-  // Save state so we can restore after redirect
-  localStorage.setItem('bp-week', JSON.stringify(weekPlan));
-  localStorage.setItem('bp-extras', JSON.stringify(extraItems));
 
   const redirectUri = location.origin + location.pathname;
   const scope = 'https://www.googleapis.com/auth/spreadsheets';
@@ -1879,6 +1978,118 @@ updateShoppingBadge();
       '<button onclick="hideGate();openSyncModal()" style="background:#2C1810;color:#F5E6C8;padding:12px 24px;border-radius:8px;font-size:13px;font-family:\'DM Mono\',monospace;border:none;cursor:pointer">Set up Google Sheets →</button>';
   }
 })();
+
+// ---- MANAGE CATEGORIES ----
+function openManageCatsModal() {
+  renderManageCats();
+  document.getElementById('manage-cats-modal').style.display = 'flex';
+}
+function closeManageCatsModal() {
+  document.getElementById('manage-cats-modal').style.display = 'none';
+}
+function renderManageCats() {
+  const list = document.getElementById('manage-cats-list');
+  list.innerHTML = userCategories.map((cat, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0E8D8">
+      <div style="width:12px;height:12px;border-radius:50%;background:${getCatColor(cat)};flex-shrink:0"></div>
+      <div style="flex:1;font-size:14px;color:#2C1810">${cat}</div>
+      <button onclick="deleteCat(${i})" style="background:none;border:none;color:#E8543A;font-size:18px;cursor:pointer;padding:0 4px">×</button>
+    </div>`).join('');
+}
+function addCat() {
+  const input = document.getElementById('new-cat-input');
+  const name = input.value.trim();
+  if (!name || userCategories.includes(name)) { showToast('Category already exists or name empty'); return; }
+  userCategories.push(name);
+  saveCategories();
+  input.value = '';
+  renderManageCats();
+  renderRecipes();
+  showToast('Category added!');
+}
+function deleteCat(idx) {
+  const cat = userCategories[idx];
+  if (recipes.some(r => r.category === cat)) { showToast('Cannot delete — recipes use this category'); return; }
+  userCategories.splice(idx, 1);
+  saveCategories();
+  renderManageCats();
+  renderRecipes();
+  showToast('Category deleted');
+}
+
+// ---- WEEK HISTORY MODAL ----
+function openWeekHistoryModal() {
+  renderWeekHistory();
+  document.getElementById('week-history-modal').style.display = 'flex';
+}
+function closeWeekHistoryModal() {
+  document.getElementById('week-history-modal').style.display = 'none';
+}
+function renderWeekHistory() {
+  const list = document.getElementById('week-history-list');
+  if (weekHistory.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#C4B090;font-size:13px;padding:24px">No saved weeks yet.<br>Use the Save Week button after planning.</div>';
+    return;
+  }
+  list.innerHTML = [...weekHistory].reverse().map(h => {
+    const d = new Date(h.weekOf);
+    const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const meals = DAYS.map(day => h.plan[day] && h.plan[day].length > 0 ? h.plan[day].map(r => r.name).join(', ') : '—');
+    return `
+      <div style="border:1px solid #F0E8D8;border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-weight:600;color:#2C1810;font-size:14px">Week of ${label}</div>
+          <button onclick="loadWeekFromHistory('${h.weekOf}')" style="background:#2C1810;color:#F5E6C8;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer">Load</button>
+        </div>
+        ${DAYS.map((day, i) => `<div style="font-size:12px;color:#6B5D4F;padding:3px 0"><span style="font-family:'DM Mono',monospace;color:#C4B090;display:inline-block;width:80px">${day.substring(0,3).toUpperCase()}</span>${meals[i]}</div>`).join('')}
+      </div>`;
+  }).join('');
+}
+function loadWeekFromHistory(weekOf) {
+  const entry = weekHistory.find(h => h.weekOf === weekOf);
+  if (!entry) return;
+  DAYS.forEach(d => {
+    weekPlan[d] = (entry.plan[d] || []).map(item => {
+      const recipe = recipes.find(r => r.id === item.id);
+      return recipe || null;
+    }).filter(Boolean);
+  });
+  save();
+  closeWeekHistoryModal();
+  switchView('planner');
+  showToast('Week loaded!');
+}
+
+// ---- WEEK PLAN SHEETS SYNC ----
+const WEEK_TAB = 'Week Plans';
+async function pushWeekPlanToSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const header = [['weekOf', ...DAYS]];
+    const rows = weekHistory.map(h => [h.weekOf, ...DAYS.map(d => (h.plan[d]||[]).map(r=>r.name).join(', '))]);
+    const values = [...header, ...rows];
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1:H5000:clear`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } });
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A1?valueInputOption=RAW`,
+      { method: 'PUT', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) });
+  } catch(e) { console.error('Week plan sync error', e); }
+}
+async function loadWeekHistoryFromSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${WEEK_TAB}!A2:H1000`,
+      { headers: { Authorization: 'Bearer ' + syncAccessToken } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = data.values || [];
+    if (rows.length === 0) return;
+    weekHistory = rows.map(row => ({
+      weekOf: row[0],
+      plan: Object.fromEntries(DAYS.map((d, i) => [d, row[i+1] ? row[i+1].split(', ').filter(Boolean).map(name => ({ id: (recipes.find(r=>r.name===name)||{id:0}).id, name })) : []]))
+    }));
+    localStorage.setItem('bp-history', JSON.stringify(weekHistory));
+  } catch(e) { console.error('Week history load error', e); }
+}
 
 // ---- SERVICE WORKER ----
 if ('serviceWorker' in navigator) {
