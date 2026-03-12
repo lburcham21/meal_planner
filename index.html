@@ -1669,19 +1669,32 @@ async function runImport(mode) {
       const url = document.getElementById('import-url').value.trim();
       if (!url) { hideLoading(); resetImportState(); showToast('Please enter a URL'); return; }
       setLoadingStep(1);
-      // Fetch URL content via a CORS proxy
+      // Fetch URL content via CORS proxies with fallbacks
       let pageText = '';
-      try {
-        const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
-        const res = await fetch(proxyUrl);
-        const json = await res.json();
-        // Strip HTML tags for cleaner text
-        const div = document.createElement('div');
-        div.innerHTML = json.contents || '';
-        pageText = div.innerText || div.textContent || '';
-        pageText = pageText.replace(/\s+/g, ' ').slice(0, 12000);
-      } catch(e) {
-        pageText = `URL: ${url}\n(Could not fetch page content directly — please paste the recipe text manually or use file/image import)`;
+      const proxies = [
+        u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+        u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+        u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+      ];
+      for (const makeProxy of proxies) {
+        try {
+          const res = await fetch(makeProxy(url));
+          if (!res.ok) continue;
+          const text = await res.text();
+          // allorigins returns JSON, others return raw HTML
+          let html = text;
+          try { const json = JSON.parse(text); html = json.contents || text; } catch {}
+          const div = document.createElement('div');
+          div.innerHTML = html;
+          const extracted = div.innerText || div.textContent || '';
+          if (extracted.length > 200) {
+            pageText = extracted.replace(/\s+/g, ' ').slice(0, 12000);
+            break;
+          }
+        } catch(e) { continue; }
+      }
+      if (!pageText) {
+        pageText = `URL: ${url}\n(Could not fetch page content — please paste the recipe text manually or use file/image import)`;
       }
       setLoadingStep(2);
       messages = [{ role: 'user', content: `Extract the recipe from this webpage content and return it as JSON.\n\nPage URL: ${url}\n\nPage content:\n${pageText}` }];
