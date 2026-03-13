@@ -2513,11 +2513,21 @@ async function loadStaplesFromSheets() {
       `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${STAPLES_TAB}!A2:A500`,
       { headers: { Authorization: 'Bearer ' + syncAccessToken } }
     );
-    if (!res.ok) return;
+    if (!res.ok) {
+      // Tab doesn't exist yet — push local staples to create it
+      if (staples.size > 0) await pushStaplesToSheets();
+      return;
+    }
     const data = await res.json();
     const rows = data.values || [];
-    if (rows.length === 0) return;
-    staples = new Set(rows.map(r => r[0]).filter(Boolean));
+    if (rows.length === 0) {
+      // Sheet is empty — push local staples if we have any
+      if (staples.size > 0) await pushStaplesToSheets();
+      return;
+    }
+    // Merge: union of sheet and local
+    const sheetStaples = new Set(rows.map(r => r[0]).filter(Boolean));
+    staples = new Set([...staples, ...sheetStaples]);
     localStorage.setItem('bp-staples', JSON.stringify([...staples]));
   } catch(e) { console.error('Staples load error', e); }
 }
