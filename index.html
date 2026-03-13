@@ -2210,7 +2210,6 @@ function manualSignIn() {
       document.getElementById('sync-step-connected').style.display = 'block';
       loadFromSheets();
       pushCategoriesToSheets();
-      pushStaplesToSheets();
     }
     if (e.data && e.data.error) {
       window.removeEventListener('message', handler);
@@ -2258,7 +2257,6 @@ updateShoppingBadge();
       hideGate();
       loadFromSheets();
       pushCategoriesToSheets();
-      pushStaplesToSheets();
       return;
     }
   }
