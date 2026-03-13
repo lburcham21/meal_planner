@@ -566,12 +566,32 @@
         <div class="page-title">Shopping List</div>
         <div class="page-sub" id="shopping-sub">Plan your week first to generate a shopping list</div>
       </div>
-      <button class="btn btn-dark" id="copy-btn" onclick="copyList()" style="display:none">📋 Copy All</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline" onclick="openStaplesModal()">🥫 Staples</button>
+        <button class="btn btn-dark" id="copy-btn" onclick="copyList()" style="display:none">📋 Copy All</button>
+      </div>
     </div>
     <div id="shopping-content"></div>
   </div>
 
 </main>
+
+<!-- STAPLES MODAL -->
+<div id="staples-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeStaplesModal()">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">🥫 Hidden Staples</div>
+        <div style="font-size:13px;color:#8B6914;font-style:italic;margin-top:4px">Items hidden from your shopping list</div>
+      </div>
+      <button class="close-btn" onclick="closeStaplesModal()">×</button>
+    </div>
+    <div id="staples-list"></div>
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #F0E8D8;font-size:12px;color:#C4B090;font-family:'DM Mono',monospace">
+      Long-press any shopping list item to hide it here
+    </div>
+  </div>
+</div>
 
 <!-- ADD RECIPE MODAL -->
 <div id="add-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAddModal()">
@@ -853,7 +873,49 @@ for (const day of DAYS) {
 }
 let selectedCategory = "All";
 let selectedTags = new Set();
-let recipeView = localStorage.getItem('bp-view') || 'card'; // 'card' or 'list'
+let recipeView = localStorage.getItem('bp-view') || 'card';
+let staples = new Set(JSON.parse(localStorage.getItem('bp-staples') || '[]'));
+
+function saveStaples() { localStorage.setItem('bp-staples', JSON.stringify([...staples])); }
+
+let longPressTimer = null;
+function startLongPress(item, e) {
+  longPressTimer = setTimeout(() => { markAsStaple(item); }, 600);
+}
+function cancelLongPress() { clearTimeout(longPressTimer); }
+
+function markAsStaple(item) {
+  staples.add(item.toLowerCase());
+  saveStaples();
+  showToast(`"${item}" hidden from list. Long-press again to undo in staples.`);
+  renderShopping();
+}
+
+function removeStaple(item) {
+  staples.delete(item.toLowerCase());
+  saveStaples();
+  renderShopping();
+}
+
+function openStaplesModal() {
+  const modal = document.getElementById('staples-modal');
+  renderStaplesList();
+  modal.style.display = 'flex';
+}
+function closeStaplesModal() { document.getElementById('staples-modal').style.display = 'none'; }
+
+function renderStaplesList() {
+  const list = document.getElementById('staples-list');
+  if (staples.size === 0) {
+    list.innerHTML = '<div style="color:#C4B090;font-size:13px;font-style:italic;text-align:center;padding:20px">No staples hidden yet.<br>Long-press any shopping list item to hide it.</div>';
+    return;
+  }
+  list.innerHTML = [...staples].sort().map(item => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0E8D8">
+      <span style="font-size:14px;color:#2C1810;text-transform:capitalize">${item}</span>
+      <button onclick="removeStaple('${item}')" style="background:none;border:none;color:#E8543A;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer;padding:4px 8px">Restore</button>
+    </div>`).join('');
+} // 'card' or 'list'
 
 function toggleRecipeView() {
   recipeView = recipeView === 'card' ? 'list' : 'card';
@@ -1486,8 +1548,11 @@ function renderShopping() {
   const list = generateShoppingList();
   sub.textContent = `${totalRecipes} recipe${totalRecipes > 1 ? 's' : ''} across ${plannedDays} day${plannedDays > 1 ? 's' : ''}`;
 
-  const recipeItemsHtml = list.map((ing, i) => `
-    <div class="shop-item" id="shop-${i}" onclick="toggleShopItem(${i})">
+  const recipeItemsHtml = list.filter(ing => !staples.has(ing.item.toLowerCase())).map((ing, i) => `
+    <div class="shop-item" id="shop-${i}" onclick="toggleShopItem(${i})"
+      oncontextmenu="event.preventDefault();markAsStaple('${ing.item.replace(/'/g,"\\'")}');"
+      ontouchstart="startLongPress('${ing.item.replace(/'/g,"\\'")}',event)"
+      ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()">
       <div class="shop-item-left">
         <div class="shop-checkbox" id="chk-${i}"></div>
         <span class="shop-item-name">${ing.item}</span>
