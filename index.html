@@ -1719,35 +1719,80 @@ async function runImport(mode) {
       const url = document.getElementById('import-url').value.trim();
       if (!url) { hideLoading(); resetImportState(); showToast('Please enter a URL'); return; }
       setLoadingStep(1);
-      // Fetch URL content via CORS proxies with fallbacks
+
       let pageText = '';
       const proxies = [
         u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
         u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
         u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
       ];
+
+      let rawHtml = '';
       for (const makeProxy of proxies) {
         try {
           const res = await fetch(makeProxy(url));
           if (!res.ok) continue;
           const text = await res.text();
-          // allorigins returns JSON, others return raw HTML
-          let html = text;
-          try { const json = JSON.parse(text); html = json.contents || text; } catch {}
-          const div = document.createElement('div');
-          div.innerHTML = html;
-          const extracted = div.innerText || div.textContent || '';
-          if (extracted.length > 200) {
-            pageText = extracted.replace(/\s+/g, ' ').slice(0, 12000);
-            break;
-          }
+          try { const json = JSON.parse(text); rawHtml = json.contents || text; } catch { rawHtml = text; }
+          if (rawHtml.length > 200) break;
         } catch(e) { continue; }
       }
+
+      if (rawHtml) {
+        // 1. Try JSON-LD schema first (most recipe sites embed structured data)
+        const jsonLdMatch = rawHtml.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+        if (jsonLdMatch) {
+          for (const block of jsonLdMatch) {
+            try {
+              const inner = block.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
+              const parsed = JSON.parse(inner);
+              const schemas = Array.isArray(parsed) ? parsed : (parsed['@graph'] || [parsed]);
+              const recipe = schemas.find(s => s['@type'] === 'Recipe' || (Array.isArray(s['@type']) && s['@type'].includes('Recipe')));
+              if (recipe) {
+                // Build clean text from structured data
+                const name = recipe.name || '';
+                const ingredients = (recipe.recipeIngredient || []).join('\n');
+                const instructions = Array.isArray(recipe.recipeInstructions)
+                  ? recipe.recipeInstructions.map(s => typeof s === 'string' ? s : s.text || '').join('\n')
+                  : (recipe.recipeInstructions || '');
+                const time = recipe.totalTime || recipe.cookTime || '';
+                const servings = recipe.recipeYield || '';
+                pageText = `Recipe: ${name}\nTime: ${time}\nServings: ${servings}\nIngredients:\n${ingredients}\nInstructions:\n${instructions}`;
+                break;
+              }
+            } catch(e) { continue; }
+          }
+        }
+
+        // 2. Fall back to targeted HTML section extraction
+        if (!pageText) {
+          const div = document.createElement('div');
+          div.innerHTML = rawHtml;
+          // Remove noise elements
+          div.querySelectorAll('nav, header, footer, script, style, .ads, .comments, .sidebar, .related, .newsletter, .social').forEach(el => el.remove());
+          // Look for ingredient/instruction sections by common class/id patterns
+          const selectors = [
+            '[class*="ingredient"]', '[id*="ingredient"]',
+            '[class*="recipe"]', '[id*="recipe"]',
+            '[class*="instruction"]', '[id*="instruction"]',
+            '[class*="directions"]', '[id*="directions"]',
+            'ul', 'ol'
+          ];
+          let focused = '';
+          for (const sel of selectors) {
+            const els = div.querySelectorAll(sel);
+            els.forEach(el => { focused += el.innerText || el.textContent || ''; });
+            if (focused.length > 300) break;
+          }
+          pageText = (focused || div.innerText || div.textContent || '').replace(/\s+/g, ' ').slice(0, 8000);
+        }
+      }
+
       if (!pageText) {
         pageText = `URL: ${url}\n(Could not fetch page content — please paste the recipe text manually or use file/image import)`;
       }
       setLoadingStep(2);
-      messages = [{ role: 'user', content: `Extract the recipe from this webpage content and return it as JSON.\n\nPage URL: ${url}\n\nPage content:\n${pageText}` }];
+      messages = [{ role: 'user', content: `Extract the recipe from this content and return it as JSON.\n\nPage URL: ${url}\n\nContent:\n${pageText}` }];
 
     } else if (mode === 'file') {
       if (!importFileData) { hideLoading(); resetImportState(); return; }
