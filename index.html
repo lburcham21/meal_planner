@@ -577,7 +577,7 @@
 </main>
 
 <!-- STAPLES MODAL -->
-<div id="staples-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeStaplesModal()">
+<div id="staples-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeStaplesModal()}else{this._closeOnUp=false}">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-header">
       <div>
@@ -594,7 +594,7 @@
 </div>
 
 <!-- ADD RECIPE MODAL -->
-<div id="add-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAddModal()">
+<div id="add-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeAddModal()}else{this._closeOnUp=false}">
   <div class="modal-box">
     <div class="modal-header">
       <div class="modal-title" id="add-modal-title">New Recipe</div>
@@ -660,7 +660,7 @@
 <div id="toast">Copied to clipboard!</div>
 
 <!-- SYNC MODAL -->
-<div id="sync-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSyncModal()">
+<div id="sync-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeSyncModal()}else{this._closeOnUp=false}">
   <div class="modal-box" style="max-width:480px">
     <div class="modal-header">
       <div>
@@ -702,7 +702,7 @@
 </div>
 
 <!-- AUTOPICK MODAL -->
-<div id="autopick-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAutopickModal()">
+<div id="autopick-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeAutopickModal()}else{this._closeOnUp=false}">
   <div class="modal-box" style="max-width:480px">
     <div class="modal-header">
       <div>
@@ -724,7 +724,7 @@
 </div>
 
 <!-- IMPORT MODAL -->
-<div id="import-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeImportModal()">
+<div id="import-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeImportModal()}else{this._closeOnUp=false}">
   <div class="modal-box import-modal-box">
     <div class="modal-header">
       <div class="modal-title">Import Recipe</div>
@@ -819,7 +819,7 @@
 </div>
 
 <!-- MANAGE CATEGORIES MODAL -->
-<div id="manage-cats-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeManageCatsModal()">
+<div id="manage-cats-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeManageCatsModal()}else{this._closeOnUp=false}">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-header">
       <div class="modal-title">Manage Categories</div>
@@ -834,7 +834,7 @@
 </div>
 
 <!-- WEEK HISTORY MODAL -->
-<div id="week-history-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeWeekHistoryModal()">
+<div id="week-history-modal" class="modal-overlay" style="display:none" onmousedown="if(event.target===this)this._closeOnUp=true" onmouseup="if(this._closeOnUp&&event.target===this){this._closeOnUp=false;closeWeekHistoryModal()}else{this._closeOnUp=false}">
   <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
       <div>
