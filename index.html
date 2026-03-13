@@ -876,7 +876,7 @@ let selectedTags = new Set();
 let recipeView = localStorage.getItem('bp-view') || 'card';
 let staples = new Set(JSON.parse(localStorage.getItem('bp-staples') || '[]'));
 
-function saveStaples() { localStorage.setItem('bp-staples', JSON.stringify([...staples])); }
+function saveStaples() { localStorage.setItem('bp-staples', JSON.stringify([...staples])); pushStaplesToSheets(); }
 
 let longPressTimer = null;
 function startLongPress(item, e) {
@@ -2091,6 +2091,7 @@ async function loadFromSheets() {
     setSyncUI('synced');
     await loadWeekHistoryFromSheets();
     await loadCategoriesFromSheets();
+    await loadStaplesFromSheets();
   } catch(e) {
     console.error('Sheets load error', e);
     setSyncUI('error');
@@ -2209,6 +2210,7 @@ function manualSignIn() {
       document.getElementById('sync-step-connected').style.display = 'block';
       loadFromSheets();
       pushCategoriesToSheets();
+      pushStaplesToSheets();
     }
     if (e.data && e.data.error) {
       window.removeEventListener('message', handler);
@@ -2256,6 +2258,7 @@ updateShoppingBadge();
       hideGate();
       loadFromSheets();
       pushCategoriesToSheets();
+      pushStaplesToSheets();
       return;
     }
   }
@@ -2476,7 +2479,48 @@ async function loadCategoriesFromSheets() {
   } catch(e) { console.error('Categories load error', e); }
 }
 
-// ---- SERVICE WORKER ----
+const STAPLES_TAB = 'Staples';
+async function pushStaplesToSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const values = [['staple'], ...[...staples].map(s => [s])];
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${STAPLES_TAB}!A1:A500:clear`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' } }
+    );
+    const writeRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${STAPLES_TAB}!A1?valueInputOption=RAW`,
+      { method: 'PUT', headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) }
+    );
+    if (!writeRes.ok) {
+      const err = await writeRes.json();
+      if (err.error && err.error.message && err.error.message.includes('Unable to parse range')) {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + syncAccessToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests: [{ addSheet: { properties: { title: STAPLES_TAB } } }] })
+        });
+        await pushStaplesToSheets();
+      }
+    }
+  } catch(e) { console.error('Staples sync error', e); }
+}
+
+async function loadStaplesFromSheets() {
+  if (!syncAccessToken || !syncSheetId) return;
+  try {
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${syncSheetId}/values/${STAPLES_TAB}!A2:A500`,
+      { headers: { Authorization: 'Bearer ' + syncAccessToken } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const rows = data.values || [];
+    if (rows.length === 0) return;
+    staples = new Set(rows.map(r => r[0]).filter(Boolean));
+    localStorage.setItem('bp-staples', JSON.stringify([...staples]));
+  } catch(e) { console.error('Staples load error', e); }
+}
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
