@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Signing in…</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #FAF7F2; color: #2C1810; }
+    p { font-size: 16px; }
+  </style>
+</head>
+<body>
+  <p>Signing in… you can close this window.</p>
+  <script>
+    // Parse the token from the URL hash
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const token = params.get('access_token');
+    const error = params.get('error');
+
+    if (token) {
+      // Send token back to the opener (main app window)
+      if (window.opener) {
+        window.opener.postMessage({ access_token: token }, 'https://lburcham21.github.io');
+      }
+      window.close();
+    } else if (error) {
+      if (window.opener) {
+        window.opener.postMessage({ error: error }, 'https://lburcham21.github.io');
+      }
+      window.close();
+    } else {
+      document.querySelector('p').textContent = 'Something went wrong. Please close this window and try again.';
+    }
+  </script>
+</body>
+</html>
