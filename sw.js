@@ -1,4 +1,4 @@
-const CACHE = 'meal-planner-v23';
+const CACHE = 'meal-planner-v24';
 const ASSETS = [
   './index.html',
   './manifest.json',

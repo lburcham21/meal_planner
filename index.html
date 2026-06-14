@@ -1043,7 +1043,7 @@ function saveCurrentWeekToHistory() {
   const weekOf = new Date().toISOString().split('T')[0];
   const idx = weekHistory.findIndex(h => h.weekOf === weekOf);
   const entry = { weekOf, plan: {} };
-  DAYS.forEach(d => { entry.plan[d] = (weekPlan[d] || []).map(r => ({ id: r.id, name: r.name })); });
+  DAYS.forEach(d => { entry.plan[d] = (weekPlan[d] || []).map(r => ({ id: r.id, name: r.name, manual: r.manual || false })); });
   if (idx >= 0) { weekHistory[idx] = entry; } else { weekHistory.push(entry); }
   if (weekHistory.length > 52) weekHistory = weekHistory.slice(-52);
   save();
@@ -1427,10 +1427,10 @@ function renderPlanner() {
       ? `<div class="day-recipe-chip" style="opacity:0.85">
             <div class="day-chip-info">
               <div class="day-chip-name">${r.name}</div>
-              <div class="day-chip-sub" style="font-style:italic">manual entry</div>
+              <div class="day-chip-sub" style="font-style:italic">${r.category || 'manual'}</div>
             </div>
             <div class="day-chip-actions">
-              <div class="day-dot" style="background:#C4B090"></div>
+              <div class="day-dot" style="background:${r.category ? getCatColor(r.category) : '#C4B090'}"></div>
               <button class="remove-chip" onclick="event.stopPropagation();removeFromDay('${day}',${idx})" title="Remove">×</button>
             </div>
           </div>`
@@ -1454,7 +1454,10 @@ function renderPlanner() {
         <div class="day-recipes-col">
           ${chipsHtml || '<div class="day-empty">Drop recipes here</div>'}
           <div style="display:flex;gap:6px;margin-top:6px">
-            <input class="field-input" id="manual-${day}" placeholder="+ Add manually…"
+            <select id="manual-cat-${day}" style="font-size:12px;padding:6px 8px;border:1px solid #E8DDD0;border-radius:8px;background:white;color:#2C1810;font-family:'DM Mono',monospace">
+              ${userCategories.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+            <input class="field-input" id="manual-${day}" placeholder="Recipe name…"
               style="font-size:12px;padding:6px 10px;flex:1"
               onkeydown="if(event.key==='Enter')addManualRecipe('${day}')" />
             <button onclick="addManualRecipe('${day}')"
@@ -1501,10 +1504,12 @@ function renderSidebar() {
 
 function addManualRecipe(day) {
   const input = document.getElementById(`manual-${day}`);
+  const catSelect = document.getElementById(`manual-cat-${day}`);
   const name = input.value.trim();
   if (!name) return;
+  const category = catSelect ? catSelect.value : '';
   if (!weekPlan[day]) weekPlan[day] = [];
-  weekPlan[day].push({ id: Date.now(), name, manual: true, category: '', time: '', ingredients: [], tags: [] });
+  weekPlan[day].push({ id: Date.now(), name, manual: true, category, time: '', ingredients: [], tags: [] });
   input.value = '';
   save();
   renderPlanner();
