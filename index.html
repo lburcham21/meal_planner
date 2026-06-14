@@ -1119,7 +1119,7 @@ async function pushToNotion() {
                   { type: 'text', text: { content: suffix } }
                 ]
               : [{ type: 'text', text: { content: recipe.name + suffix } }],
-            children: (recipe.ingredients || []).map(ing => ({
+            children: (recipe.ingredients || []).filter(ing => !staples.has(ing.item.toLowerCase())).map(ing => ({
               object: 'block', type: 'to_do',
               to_do: {
                 rich_text: [{ type: 'text', text: { content: [ing.amount, ing.item].filter(Boolean).join(' ') } }],
