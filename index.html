@@ -1087,16 +1087,14 @@ async function pushToNotion() {
     const weekOf = new Date().toISOString().split('T')[0];
     const weekDate = new Date(weekOf).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-    // Build shopping list
-    const shoppingItems = generateShoppingList().filter(i => !staples.has(i.item.toLowerCase()));
-
-    // Build children blocks
     const children = [
-      { object: 'block', type: 'heading_2', heading_2: { rich_text: [{ type: 'text', text: { content: '📅 Week of ' + weekDate } }] } },
-      { object: 'block', type: 'divider', divider: {} }
+      { object: 'block', type: 'divider', divider: {} },
+      {
+        object: 'block', type: 'heading_2',
+        heading_2: { rich_text: [{ type: 'text', text: { content: 'Week of ' + weekDate } }] }
+      }
     ];
 
-    // Add each day
     DAYS.forEach(day => {
       const dayRecipes = weekPlan[day] || [];
       if (dayRecipes.length === 0) return;
@@ -1108,56 +1106,41 @@ async function pushToNotion() {
 
       dayRecipes.forEach(r => {
         const recipe = recipes.find(x => x.id == r.id) || r;
-        const label = recipe.category ? `[${recipe.category}] ` : '';
         const protein = (recipe.tags || []).find(t => ['Chicken','Beef','Pork','Seafood','Vegetarian'].includes(t));
-        const proteinLabel = protein ? ` · ${protein}` : '';
+        const suffix = protein ? ' · ' + protein : '';
 
-        if (recipe.sourceUrl) {
-          children.push({
-            object: 'block', type: 'bulleted_list_item',
-            bulleted_list_item: { rich_text: [
-              { type: 'text', text: { content: label } },
-              { type: 'text', text: { content: recipe.name, link: { url: recipe.sourceUrl } } },
-              { type: 'text', text: { content: proteinLabel } }
-            ]}
-          });
-        } else {
-          children.push({
-            object: 'block', type: 'bulleted_list_item',
-            bulleted_list_item: { rich_text: [{ type: 'text', text: { content: label + recipe.name + proteinLabel } }] }
-          });
-        }
+        // Recipe name as bulleted item (with link if available)
+        const nameBlock = {
+          object: 'block', type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: recipe.sourceUrl
+              ? [
+                  { type: 'text', text: { content: recipe.name, link: { url: recipe.sourceUrl } } },
+                  { type: 'text', text: { content: suffix } }
+                ]
+              : [{ type: 'text', text: { content: recipe.name + suffix } }],
+            children: (recipe.ingredients || []).map(ing => ({
+              object: 'block', type: 'to_do',
+              to_do: {
+                rich_text: [{ type: 'text', text: { content: [ing.amount, ing.item].filter(Boolean).join(' ') } }],
+                checked: false
+              }
+            }))
+          }
+        };
+        children.push(nameBlock);
       });
     });
 
-    // Shopping list
-    children.push({ object: 'block', type: 'divider', divider: {} });
-    children.push({
-      object: 'block', type: 'heading_2',
-      heading_2: { rich_text: [{ type: 'text', text: { content: '🛒 Shopping List' } }] }
-    });
-
-    shoppingItems.forEach(item => {
-      const amountText = item.amounts.filter(Boolean).join(' + ');
-      children.push({
-        object: 'block', type: 'to_do',
-        to_do: {
-          rich_text: [{ type: 'text', text: { content: (amountText ? amountText + ' ' : '') + item.item } }],
-          checked: false
-        }
-      });
-    });
-
-    // Create a new child page under the parent page
+    // Create a new sub-page under the parent page
     await notionFetch('/pages', 'POST', {
-      parent: { page_id: getNotionPageId() },
+      parent: { page_id: pageId },
       properties: {
         title: { title: [{ type: 'text', text: { content: 'Week of ' + weekDate } }] }
       },
       children
     });
-
-    showToast('Week plan pushed to Notion! ✓');
+    showToast('Pushed to Notion! ✓');
   } catch(e) {
     console.error('Notion push error:', e);
     showToast('Notion sync failed: ' + e.message);
