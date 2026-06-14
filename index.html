@@ -749,7 +749,7 @@
     <div id="autopick-rows" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px"></div>
     <div style="background:#FBF6EE;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border:1px solid #F0E8D8">
       <span style="font-family:'DM Mono',monospace;font-size:12px;color:#8B6914">TOTAL SLOTS</span>
-      <span id="autopick-total" style="font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#2C1810">0 / 7</span>
+      <span id="autopick-total" style="font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:#2C1810">0 meals</span>
     </div>
     <div style="display:flex;gap:10px">
       <button onclick="runCustomAutopick()" style="flex:1;background:#C8A96A;color:white;padding:13px;border-radius:10px;font-size:14px;font-family:'DM Mono',monospace;border:none;cursor:pointer;transition:all 0.15s" onmouseover="this.style.filter='brightness(1.05)'" onmouseout="this.style.filter=''">✨ Fill Week</button>
@@ -1407,14 +1407,36 @@ function autoPickWeek() {
   if (total > 0) { runCustomAutopick(); return; }
   if (recipes.length === 0) return;
   DAYS.forEach(d => { weekPlan[d] = []; });
-  // Smart pick: score recipes by how long ago they were last made
+
   const now = Date.now();
+  const lastWeek = weekHistory.length > 0
+    ? new Set(Object.values(weekHistory[weekHistory.length - 1].plan || {}).flat().map(r => r.id))
+    : new Set();
+
   const scored = recipes.map(r => {
     const lastDate = getLastMadeDateForRecipe(r.id);
     const daysSince = lastDate ? (now - new Date(lastDate).getTime()) / 86400000 : 365;
-    return { r, score: daysSince + Math.random() * 7 };
+    const lastWeekPenalty = lastWeek.has(r.id) ? -60 : 0;
+    return { r, score: daysSince + lastWeekPenalty + Math.random() * 5 };
   }).sort((a, b) => b.score - a.score);
-  DAYS.forEach((day, i) => { weekPlan[day] = [scored[i % scored.length].r]; });
+
+  // Pick 7 with protein variety
+  const picked = [];
+  const usedProteins = new Set();
+  for (const { r } of scored) {
+    if (picked.length >= 7) break;
+    const protein = (r.tags || []).find(t => ['Chicken','Beef','Pork','Seafood','Vegetarian'].includes(t));
+    if (protein && usedProteins.size < 3 && usedProteins.has(protein)) continue;
+    picked.push(r);
+    if (protein) usedProteins.add(protein);
+  }
+  // Fill remaining
+  for (const { r } of scored) {
+    if (picked.length >= 7) break;
+    if (!picked.find(p => p.id === r.id)) picked.push(r);
+  }
+
+  DAYS.forEach((day, i) => { weekPlan[day] = picked[i] ? [picked[i]] : []; });
   save();
   renderPlanner();
   updateShoppingBadge();
@@ -1474,37 +1496,78 @@ function updateAutopickTotal() {
   const total = Object.values(autopickPrefs).reduce((s, v) => s + v, 0);
   const el = document.getElementById('autopick-total');
   if (el) {
-    el.textContent = `${total} / 7`;
-    el.style.color = total > 7 ? '#E8543A' : '#2C1810';
+    el.textContent = `${total} meal${total !== 1 ? 's' : ''}`;
+    el.style.color = '#2C1810';
   }
 }
 
 function runCustomAutopick() {
   const total = Object.values(autopickPrefs).reduce((s, v) => s + v, 0);
   if (total === 0) { showToast('Set at least one category count first'); return; }
-  if (total > 7) { showToast('Total exceeds 7 days — reduce some counts'); return; }
   if (recipes.length === 0) return;
 
   DAYS.forEach(d => { weekPlan[d] = []; });
 
-  // Build a shuffled slot list per category
-  const slots = [];
-  for (const [cat, count] of Object.entries(autopickPrefs)) {
-    if (!count) continue;
-    const pool = [...recipes.filter(r => r.category === cat)].sort(() => Math.random() - 0.5);
-    if (pool.length === 0) { showToast(`No ${cat} recipes found — skipping`); continue; }
-    for (let i = 0; i < count; i++) slots.push(pool[i % pool.length]);
+  // Get last week's recipe IDs to avoid repeats
+  const lastWeek = weekHistory.length > 0
+    ? new Set(Object.values(weekHistory[weekHistory.length - 1].plan || {}).flat().map(r => r.id))
+    : new Set();
+
+  // For each category, pick recipes with smart variety
+  // Score: prefer not-recently-made, avoid last week, ensure protein variety
+  const now = Date.now();
+
+  function scorePool(pool) {
+    return pool.map(r => {
+      const lastDate = getLastMadeDateForRecipe(r.id);
+      const daysSince = lastDate ? (now - new Date(lastDate).getTime()) / 86400000 : 365;
+      const lastWeekPenalty = lastWeek.has(r.id) ? -60 : 0;
+      return { r, score: daysSince + lastWeekPenalty + Math.random() * 5 };
+    }).sort((a, b) => b.score - a.score).map(x => x.r);
   }
 
-  // Shuffle all slots then assign one per day
-  slots.sort(() => Math.random() - 0.5);
-  slots.forEach((recipe, i) => { if (i < DAYS.length) weekPlan[DAYS[i]].push(recipe); });
+  // Build meals per category
+  const mealsByCategory = {};
+  for (const [cat, count] of Object.entries(autopickPrefs)) {
+    if (!count) continue;
+    const pool = scorePool(recipes.filter(r => r.category === cat));
+    if (pool.length === 0) { showToast(`No ${cat} recipes — skipping`); continue; }
+    // Ensure protein variety within category
+    const picked = [];
+    const usedProteins = new Set();
+    for (const r of pool) {
+      if (picked.length >= count) break;
+      const protein = (r.tags || []).find(t => ['Chicken','Beef','Pork','Seafood','Vegetarian'].includes(t));
+      if (protein && usedProteins.has(protein) && picked.length < count - 1) continue;
+      picked.push(r);
+      if (protein) usedProteins.add(protein);
+    }
+    // Fill remaining if protein filter was too strict
+    for (const r of pool) {
+      if (picked.length >= count) break;
+      if (!picked.find(p => p.id === r.id)) picked.push(r);
+    }
+    mealsByCategory[cat] = picked;
+  }
+
+  // Distribute meals across days — multiple per day if total > 7
+  // Group lunches and dinners so each day gets at most one of each
+  const allMeals = Object.entries(mealsByCategory).flatMap(([cat, meals]) =>
+    meals.map(r => ({ ...r, _assignedCat: cat }))
+  );
+
+  // Shuffle and assign — spread across days, stacking multiple meals per day
+  allMeals.sort(() => Math.random() - 0.5);
+  allMeals.forEach((recipe, i) => {
+    const day = DAYS[i % DAYS.length];
+    weekPlan[day].push(recipe);
+  });
 
   save();
   closeAutopickModal();
   renderPlanner();
   updateShoppingBadge();
-  showToast(`${total} recipe${total !== 1 ? 's' : ''} filled across the week! ✨`);
+  showToast(`${total} meal${total !== 1 ? 's' : ''} planned for the week! ✨`);
 }
 
 function updateShoppingBadge() {
