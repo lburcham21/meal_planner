@@ -1423,9 +1423,18 @@ function renderPlanner() {
   const dayList = document.getElementById('day-list');
   dayList.innerHTML = DAYS.map(day => {
     const dayRecipes = weekPlan[day] || [];
-    const chipsHtml = dayRecipes.length > 0
-      ? dayRecipes.map((r, idx) => `
-          <div class="day-recipe-chip" style="cursor:pointer" onclick="openDetail(${r.id})">
+    const chipsHtml = dayRecipes.map((r, idx) => r.manual
+      ? `<div class="day-recipe-chip" style="opacity:0.85">
+            <div class="day-chip-info">
+              <div class="day-chip-name">${r.name}</div>
+              <div class="day-chip-sub" style="font-style:italic">manual entry</div>
+            </div>
+            <div class="day-chip-actions">
+              <div class="day-dot" style="background:#C4B090"></div>
+              <button class="remove-chip" onclick="event.stopPropagation();removeFromDay('${day}',${idx})" title="Remove">×</button>
+            </div>
+          </div>`
+      : `<div class="day-recipe-chip" style="cursor:pointer" onclick="openDetail(${r.id})">
             <div class="day-chip-info">
               <div class="day-chip-name">${r.name}</div>
               <div class="day-chip-sub">${r.category} · ${r.time}</div>
@@ -1434,8 +1443,7 @@ function renderPlanner() {
               <div class="day-dot" style="background:${getCatColor(r.category)}"></div>
               <button class="remove-chip" onclick="event.stopPropagation();removeFromDay('${day}',${idx})" title="Remove">×</button>
             </div>
-          </div>`).join('')
-      : `<div class="day-empty">Drop recipes here</div>`;
+          </div>`).join('');
 
     return `
       <div class="day-slot" id="slot-${day}"
@@ -1443,7 +1451,16 @@ function renderPlanner() {
         ondragleave="this.classList.remove('drag-over')"
         ondrop="dropOnDay(event,'${day}')">
         <div class="day-label">${day.toUpperCase()}</div>
-        <div class="day-recipes-col">${chipsHtml}</div>
+        <div class="day-recipes-col">
+          ${chipsHtml || '<div class="day-empty">Drop recipes here</div>'}
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input class="field-input" id="manual-${day}" placeholder="+ Add manually…"
+              style="font-size:12px;padding:6px 10px;flex:1"
+              onkeydown="if(event.key==='Enter')addManualRecipe('${day}')" />
+            <button onclick="addManualRecipe('${day}')"
+              style="background:#C8A96A;color:white;border:none;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer">+</button>
+          </div>
+        </div>
       </div>`;
   }).join('');
 
@@ -1480,6 +1497,18 @@ function renderSidebar() {
   sidebar.innerHTML = `
     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">${filterPills}</div>
     ${items}`;
+}
+
+function addManualRecipe(day) {
+  const input = document.getElementById(`manual-${day}`);
+  const name = input.value.trim();
+  if (!name) return;
+  if (!weekPlan[day]) weekPlan[day] = [];
+  weekPlan[day].push({ id: Date.now(), name, manual: true, category: '', time: '', ingredients: [], tags: [] });
+  input.value = '';
+  save();
+  renderPlanner();
+  updateShoppingBadge();
 }
 
 function dropOnDay(e, day) {
