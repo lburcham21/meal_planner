@@ -659,8 +659,8 @@
         <input class="field-input" id="f-tags" placeholder="e.g. chicken, quick, gluten-free" style="font-family:'DM Mono',monospace" />
       </div>
       <div>
-        <div class="field-label">SOURCE URL (OPTIONAL)</div>
-        <input class="field-input" id="f-source-url" placeholder="https://…" style="font-family:'DM Mono',monospace;font-size:12px" />
+        <div class="field-label">SOURCE (URL OR COOKBOOK REFERENCE)</div>
+        <input class="field-input" id="f-source-url" placeholder="https://… or Ottolenghi Simple, p.142" style="font-family:'DM Mono',monospace;font-size:12px" />
       </div>
       <div>
         <div class="field-label">INGREDIENTS</div>
@@ -1113,11 +1113,13 @@ async function pushToNotion() {
         const nameBlock = {
           object: 'block', type: 'bulleted_list_item',
           bulleted_list_item: {
-            rich_text: recipe.sourceUrl
+            rich_text: recipe.sourceUrl && recipe.sourceUrl.startsWith('http')
               ? [
                   { type: 'text', text: { content: recipe.name, link: { url: recipe.sourceUrl } } },
                   { type: 'text', text: { content: suffix } }
                 ]
+              : recipe.sourceUrl
+              ? [{ type: 'text', text: { content: recipe.name + suffix + ' (' + recipe.sourceUrl + ')' } }]
               : [{ type: 'text', text: { content: recipe.name + suffix } }],
             children: (recipe.ingredients || []).filter(ing => !staples.has(ing.item.toLowerCase())).map(ing => ({
               object: 'block', type: 'to_do',
@@ -1208,7 +1210,9 @@ function renderRecipes() {
         </div>
         <div class="card-tags">${r.tags.slice(0,3).map(t=>`<span class="tag-pill">${t}</span>`).join('')}</div>
         ${getLastMadeHtml(r.id)}
-        ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-block;margin-top:8px;font-size:11px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.75">🔗 Link to recipe</a>` : ''}
+        ${r.sourceUrl ? (r.sourceUrl.startsWith('http') 
+          ? `<a href="${r.sourceUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-block;margin-top:8px;font-size:11px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.75">🔗 Link to recipe</a>`
+          : `<span style="display:inline-block;margin-top:8px;font-size:11px;color:#8B6914;font-family:'DM Mono',monospace;opacity:0.75">📖 ${r.sourceUrl}</span>`) : ''}
       </div>
     </div>
   `).join('');
@@ -1365,7 +1369,10 @@ function openDetail(id) {
   const sourceEl = document.getElementById('detail-source-url');
   if (sourceEl) {
     if (r.sourceUrl) {
-      sourceEl.innerHTML = `<a href="${r.sourceUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.8">🔗 View original recipe</a>`;
+      const isUrl = r.sourceUrl.startsWith('http');
+      sourceEl.innerHTML = isUrl
+        ? `<a href="${r.sourceUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#8B6914;font-family:'DM Mono',monospace;text-decoration:none;opacity:0.8">🔗 View original recipe</a>`
+        : `<span style="font-size:12px;color:#8B6914;font-family:'DM Mono',monospace;opacity:0.8">📖 ${r.sourceUrl}</span>`;
       sourceEl.style.display = 'block';
     } else {
       sourceEl.style.display = 'none';
